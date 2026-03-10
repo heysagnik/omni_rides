@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
 import '../theme/app_colors.dart';
 import '../widgets/primary_button.dart';
-import '../widgets/service_selector.dart';
 
 class RouteSelectionScreen extends StatefulWidget {
   const RouteSelectionScreen({super.key});
@@ -18,39 +17,8 @@ class _RouteSelectionScreenState extends State<RouteSelectionScreen>
   final _destCtrl = TextEditingController();
   late AnimationController _animCtrl;
 
-  // Predefined destinations for demo
-  static const List<Map<String, dynamic>> _suggestions = [
-    {
-      'name': 'India Gate',
-      'area': 'Rajpath, New Delhi',
-      'lat': 28.6129,
-      'lng': 77.2295,
-    },
-    {
-      'name': 'Lotus Temple',
-      'area': 'Bahapur, New Delhi',
-      'lat': 28.5535,
-      'lng': 77.2588,
-    },
-    {
-      'name': 'Qutub Minar',
-      'area': 'Mehrauli, New Delhi',
-      'lat': 28.5245,
-      'lng': 77.1855,
-    },
-    {
-      'name': 'Red Fort',
-      'area': 'Chandni Chowk, Old Delhi',
-      'lat': 28.6562,
-      'lng': 77.2410,
-    },
-    {
-      'name': 'Connaught Place',
-      'area': 'Central Delhi',
-      'lat': 28.6315,
-      'lng': 77.2167,
-    },
-  ];
+  // Destinations — will be populated from backend
+  static const List<Map<String, dynamic>> _suggestions = [];
 
   @override
   void initState() {
@@ -107,8 +75,12 @@ class _RouteSelectionScreenState extends State<RouteSelectionScreen>
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final isKeyboardOpen = bottomInset > 0;
+
     return Scaffold(
       backgroundColor: AppColors.white,
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
@@ -229,32 +201,6 @@ class _RouteSelectionScreenState extends State<RouteSelectionScreen>
               ),
             ),
 
-            // Service Selector
-            const SizedBox(height: 16),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Service Type',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textDark,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            ServiceSelector(
-              selected: state.selectedService,
-              onSelected: (s) => state.setSelectedService(s),
-            ),
-
-            const SizedBox(height: 16),
-            const Divider(indent: 20, endIndent: 20),
-            const SizedBox(height: 8),
-
             // Destination Suggestions
             Expanded(
               child: ListView.builder(
@@ -297,8 +243,8 @@ class _RouteSelectionScreenState extends State<RouteSelectionScreen>
               ),
             ),
 
-            // Fare & Action
-            if (state.destinationAddress.isNotEmpty)
+            // Fare & Action — hide when keyboard is open
+            if (state.destinationAddress.isNotEmpty && !isKeyboardOpen)
               Container(
                 padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
                 decoration: BoxDecoration(

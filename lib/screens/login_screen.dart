@@ -67,6 +67,7 @@ class _LoginScreenState extends State<LoginScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.white,
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: SlideTransition(
           position: _slideAnim,
@@ -76,89 +77,99 @@ class _LoginScreenState extends State<LoginScreen>
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Form(
                 key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 40),
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryGreen.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(16),
+                child: CustomScrollView(
+                  slivers: [
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 40),
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryGreen.withValues(
+                                alpha: 0.1,
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: const Icon(
+                              Icons.person_outline_rounded,
+                              color: AppColors.primaryGreen,
+                              size: 30,
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          const Text(
+                            'Confirm your\ninformation',
+                            style: TextStyle(
+                              fontSize: 30,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textDark,
+                              height: 1.2,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          const Text(
+                            'Please enter your details to get started.',
+                            style: TextStyle(
+                              fontSize: 15,
+                              color: AppColors.textMedium,
+                            ),
+                          ),
+                          const SizedBox(height: 36),
+                          InputField(
+                            label: 'Full Name',
+                            hint: 'Enter your name',
+                            controller: _nameCtrl,
+                            prefixIcon: Icons.person_rounded,
+                            keyboardType: TextInputType.name,
+                            validator: (v) => v == null || v.trim().isEmpty
+                                ? 'Name is required'
+                                : null,
+                          ),
+                          const SizedBox(height: 20),
+                          InputField(
+                            label: 'Phone Number',
+                            hint: 'Enter your phone number',
+                            controller: _phoneCtrl,
+                            prefixText: '+91  ',
+                            prefixIcon: Icons.phone_rounded,
+                            keyboardType: TextInputType.phone,
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty)
+                                return 'Phone is required';
+                              if (v.trim().length < 10)
+                                return 'Enter a valid phone number';
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 20),
+                          InputField(
+                            label: 'Email Address',
+                            hint: 'Enter your email',
+                            controller: _emailCtrl,
+                            prefixIcon: Icons.email_rounded,
+                            keyboardType: TextInputType.emailAddress,
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty)
+                                return 'Email is required';
+                              if (!v.contains('@'))
+                                return 'Enter a valid email';
+                              return null;
+                            },
+                          ),
+                          const Spacer(),
+                          PrimaryButton(
+                            text: 'Next',
+                            isLoading: _isLoading,
+                            icon: Icons.arrow_forward_rounded,
+                            onPressed: _onNext,
+                          ),
+                          const SizedBox(height: 32),
+                        ],
                       ),
-                      child: const Icon(
-                        Icons.person_outline_rounded,
-                        color: AppColors.primaryGreen,
-                        size: 30,
-                      ),
                     ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      'Confirm your\ninformation',
-                      style: TextStyle(
-                        fontSize: 30,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textDark,
-                        height: 1.2,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    const Text(
-                      'Please enter your details to get started.',
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: AppColors.textMedium,
-                      ),
-                    ),
-                    const SizedBox(height: 36),
-                    InputField(
-                      label: 'Full Name',
-                      hint: 'Enter your name',
-                      controller: _nameCtrl,
-                      prefixIcon: Icons.person_rounded,
-                      keyboardType: TextInputType.name,
-                      validator: (v) => v == null || v.trim().isEmpty
-                          ? 'Name is required'
-                          : null,
-                    ),
-                    const SizedBox(height: 20),
-                    InputField(
-                      label: 'Phone Number',
-                      hint: 'Enter your phone number',
-                      controller: _phoneCtrl,
-                      prefixText: '+91  ',
-                      prefixIcon: Icons.phone_rounded,
-                      keyboardType: TextInputType.phone,
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty)
-                          return 'Phone is required';
-                        if (v.trim().length < 10)
-                          return 'Enter a valid phone number';
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 20),
-                    InputField(
-                      label: 'Email Address',
-                      hint: 'Enter your email',
-                      controller: _emailCtrl,
-                      prefixIcon: Icons.email_rounded,
-                      keyboardType: TextInputType.emailAddress,
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty)
-                          return 'Email is required';
-                        if (!v.contains('@')) return 'Enter a valid email';
-                        return null;
-                      },
-                    ),
-                    const Spacer(),
-                    PrimaryButton(
-                      text: 'Next',
-                      isLoading: _isLoading,
-                      icon: Icons.arrow_forward_rounded,
-                      onPressed: _onNext,
-                    ),
-                    const SizedBox(height: 32),
                   ],
                 ),
               ),

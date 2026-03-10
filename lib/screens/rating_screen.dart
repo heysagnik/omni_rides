@@ -72,132 +72,145 @@ class _RatingScreenState extends State<RatingScreen>
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            children: [
-              const Spacer(flex: 2),
-              // Success Checkmark
-              ScaleTransition(
-                scale: _checkScale,
-                child: Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        AppColors.primaryGreen,
-                        AppColors.primaryGreenLight,
-                      ],
-                    ),
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primaryGreen.withValues(alpha: 0.3),
-                        blurRadius: 30,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.check_rounded,
-                    size: 64,
-                    color: AppColors.white,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 32),
-              FadeTransition(
-                opacity: _fadeCtrl,
+          child: CustomScrollView(
+            slivers: [
+              SliverFillRemaining(
+                hasScrollBody: false,
                 child: Column(
                   children: [
-                    Text(
-                      _submitted ? 'Thank you!' : 'Ride Successful!',
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textDark,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      _submitted
-                          ? 'Redirecting to home...'
-                          : 'How was your ride with ${state.driverName.isNotEmpty ? state.driverName : "your driver"}?',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        color: AppColors.textMedium,
-                        height: 1.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 40),
-              if (!_submitted) ...[
-                // Star Rating
-                FadeTransition(
-                  opacity: _fadeCtrl,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 24,
-                      horizontal: 16,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.backgroundGrey,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Column(
-                      children: [
-                        const Text(
-                          'Rate your driver',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textDark,
+                    const Spacer(flex: 2),
+                    // Success Checkmark
+                    ScaleTransition(
+                      scale: _checkScale,
+                      child: Container(
+                        width: 120,
+                        height: 120,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              AppColors.primaryGreen,
+                              AppColors.primaryGreenLight,
+                            ],
                           ),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primaryGreen.withValues(
+                                alpha: 0.3,
+                              ),
+                              blurRadius: 30,
+                              offset: const Offset(0, 10),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 16),
-                        StarRating(
-                          rating: _rating,
-                          size: 48,
-                          onRatingChanged: (r) => setState(() => _rating = r),
+                        child: const Icon(
+                          Icons.check_rounded,
+                          size: 64,
+                          color: AppColors.white,
                         ),
-                        if (_rating > 0) ...[
-                          const SizedBox(height: 12),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    FadeTransition(
+                      opacity: _fadeCtrl,
+                      child: Column(
+                        children: [
                           Text(
-                            _getRatingText(_rating),
+                            _submitted ? 'Thank you!' : 'Ride Successful!',
                             style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: AppColors.primaryGreen,
+                              fontSize: 28,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textDark,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            _submitted
+                                ? 'Redirecting to home...'
+                                : 'How was your ride with ${state.driverName.isNotEmpty ? state.driverName : "your driver"}?',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              color: AppColors.textMedium,
+                              height: 1.5,
                             ),
                           ),
                         ],
-                      ],
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 40),
+                    if (!_submitted) ...[
+                      // Star Rating
+                      FadeTransition(
+                        opacity: _fadeCtrl,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 24,
+                            horizontal: 16,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.backgroundGrey,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Column(
+                            children: [
+                              const Text(
+                                'Rate your driver',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textDark,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              StarRating(
+                                rating: _rating,
+                                size: 40,
+                                onRatingChanged: (r) =>
+                                    setState(() => _rating = r),
+                              ),
+                              if (_rating > 0) ...[
+                                const SizedBox(height: 12),
+                                Text(
+                                  _getRatingText(_rating),
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: AppColors.primaryGreen,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                    const Spacer(flex: 3),
+                    if (!_submitted)
+                      FadeTransition(
+                        opacity: _fadeCtrl,
+                        child: PrimaryButton(
+                          text: 'Submit',
+                          onPressed: _submit,
+                        ),
+                      ),
+                    if (_submitted)
+                      const SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            AppColors.primaryGreen,
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 32),
+                  ],
                 ),
-              ],
-              const Spacer(flex: 3),
-              if (!_submitted)
-                FadeTransition(
-                  opacity: _fadeCtrl,
-                  child: PrimaryButton(text: 'Submit', onPressed: _submit),
-                ),
-              if (_submitted)
-                const SizedBox(
-                  width: 28,
-                  height: 28,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      AppColors.primaryGreen,
-                    ),
-                  ),
-                ),
-              const SizedBox(height: 32),
+              ),
             ],
           ),
         ),

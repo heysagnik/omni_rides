@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'providers/app_state.dart';
 import 'theme/app_theme.dart';
 import 'screens/splash_screen.dart';
+import 'screens/auth_options_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/otp_screen.dart';
 import 'screens/location_permission_screen.dart';
@@ -16,6 +17,7 @@ import 'screens/payment_screen.dart';
 import 'screens/rating_screen.dart';
 import 'screens/my_rides_screen.dart';
 import 'screens/notifications_screen.dart';
+import 'screens/safety_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -42,6 +44,7 @@ class UserApp extends StatelessWidget {
         initialRoute: '/',
         routes: {
           '/': (context) => const SplashScreen(),
+          '/auth-options': (context) => const AuthOptionsScreen(),
           '/login': (context) => const LoginScreen(),
           '/otp': (context) => const OTPScreen(),
           '/location-permission': (context) => const LocationPermissionScreen(),
@@ -54,6 +57,7 @@ class UserApp extends StatelessWidget {
           '/rating': (context) => const RatingScreen(),
           '/my-rides': (context) => const MyRidesScreen(),
           '/notifications': (context) => const NotificationsScreen(),
+          '/safety': (context) => const SafetyScreen(),
         },
       ),
     );

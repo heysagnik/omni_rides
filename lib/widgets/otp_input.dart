@@ -57,9 +57,9 @@ class _OtpInputState extends State<OtpInput> {
       mainAxisAlignment: MainAxisAlignment.center,
       children: List.generate(widget.length, (index) {
         return Container(
-          width: 50,
-          height: 60,
-          margin: const EdgeInsets.symmetric(horizontal: 6),
+          width: 44,
+          height: 54,
+          margin: const EdgeInsets.symmetric(horizontal: 4),
           child: TextFormField(
             controller: _controllers[index],
             focusNode: _focusNodes[index],

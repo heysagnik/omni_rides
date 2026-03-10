@@ -53,33 +53,14 @@ class SideDrawer extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.star_rounded,
-                        color: AppColors.starFilled,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        state.userRating.toStringAsFixed(1),
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.white,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        state.userPhone.isNotEmpty
-                            ? state.userPhone
-                            : '+91 XXXXX XXXXX',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AppColors.white.withValues(alpha: 0.8),
-                        ),
-                      ),
-                    ],
+                  Text(
+                    state.userPhone.isNotEmpty
+                        ? state.userPhone
+                        : '+91 XXXXX XXXXX',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.white.withValues(alpha: 0.8),
+                    ),
                   ),
                 ],
               ),
@@ -116,7 +97,10 @@ class SideDrawer extends StatelessWidget {
             _DrawerItem(
               icon: Icons.shield_outlined,
               title: 'Safety',
-              onTap: () {},
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/safety');
+              },
             ),
             _DrawerItem(
               icon: Icons.settings_outlined,

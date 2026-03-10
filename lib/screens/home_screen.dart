@@ -148,7 +148,7 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                     const SizedBox(height: 6),
                     const Text(
-                      'Where to & for how much?',
+                      'Where to go ?',
                       style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w700,
@@ -188,32 +188,6 @@ class _HomeScreenState extends State<HomeScreen>
                           ],
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 20),
-                    // Quick Services
-                    Row(
-                      children: [
-                        _QuickService(
-                          icon: Icons.directions_car_rounded,
-                          label: 'Ride',
-                          onTap: () =>
-                              Navigator.pushNamed(context, '/route-selection'),
-                        ),
-                        const SizedBox(width: 12),
-                        _QuickService(
-                          icon: Icons.restaurant_rounded,
-                          label: 'Food',
-                          onTap: () =>
-                              Navigator.pushNamed(context, '/route-selection'),
-                        ),
-                        const SizedBox(width: 12),
-                        _QuickService(
-                          icon: Icons.inventory_2_rounded,
-                          label: 'Parcel',
-                          onTap: () =>
-                              Navigator.pushNamed(context, '/route-selection'),
-                        ),
-                      ],
                     ),
                   ],
                 ),
@@ -321,48 +295,6 @@ class _FloatingButton extends StatelessWidget {
           ],
         ),
         child: Icon(icon, color: AppColors.textDark, size: 24),
-      ),
-    );
-  }
-}
-
-class _QuickService extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  const _QuickService({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          decoration: BoxDecoration(
-            color: AppColors.primaryGreen.withValues(alpha: 0.06),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Column(
-            children: [
-              Icon(icon, color: AppColors.primaryGreen, size: 28),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textDark,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
