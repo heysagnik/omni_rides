@@ -46,7 +46,7 @@ class _CancelModalState extends State<CancelModal> {
           const Text(
             'Why do you want to cancel?',
             style: TextStyle(
-              fontSize: 22,
+              fontSize: 16,
               fontWeight: FontWeight.w700,
               color: AppColors.textDark,
             ),
@@ -107,20 +107,21 @@ class _CancelModalState extends State<CancelModal> {
           const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
-            height: 56,
+            height: 50,
             child: ElevatedButton(
               onPressed: _selectedReason != null ? widget.onCancel : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.error,
                 foregroundColor: AppColors.white,
                 disabledBackgroundColor: AppColors.divider,
+                elevation: 0,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(12),
                 ),
               ),
               child: const Text(
-                'Submit',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                'Cancel ride',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
               ),
             ),
           ),

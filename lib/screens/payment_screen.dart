@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
 import '../theme/app_colors.dart';
+import '../routes/app_router.dart';
+import '../services/ride_service.dart';
 
 class PaymentScreen extends StatefulWidget {
   const PaymentScreen({super.key});
@@ -12,10 +14,12 @@ class PaymentScreen extends StatefulWidget {
 
 class _PaymentScreenState extends State<PaymentScreen>
     with SingleTickerProviderStateMixin {
-  String? _selectedMethod;
-  bool _isProcessing = false;
+  bool _isConfirming = false;
+  bool _isPaid = false;
+  double _finalFare = 0; // authoritative amount from GET /payment/:rideId
 
   late AnimationController _animCtrl;
+  final RideService _rideService = RideService();
 
   @override
   void initState() {
@@ -24,6 +28,7 @@ class _PaymentScreenState extends State<PaymentScreen>
       vsync: this,
       duration: const Duration(milliseconds: 600),
     )..forward();
+    _fetchPaymentDetails();
   }
 
   @override
@@ -32,26 +37,55 @@ class _PaymentScreenState extends State<PaymentScreen>
     super.dispose();
   }
 
-  void _processPayment() {
-    if (_selectedMethod == null) return;
+  Future<void> _fetchPaymentDetails() async {
+    final state = context.read<AppState>();
+    final rideId = state.rideId;
+    if (rideId.isEmpty) return;
+
+    final payment = await _rideService.getPaymentDetails(rideId);
+    if (!mounted || payment == null) return;
+
+    final paymentId = payment['id'] as String? ?? '';
+    if (paymentId.isNotEmpty) state.setPaymentId(paymentId);
+
+    // Use the authoritative amount from the payment record
+    final amount = (payment['amount'] as num?)?.toDouble() ?? 0;
+    if (amount > 0 && mounted) {
+      setState(() => _finalFare = amount);
+    }
+  }
+
+  Future<void> _confirmCashPayment() async {
+    setState(() => _isConfirming = true);
 
     final state = context.read<AppState>();
-    state.setPaymentMethod(_selectedMethod!);
+    state.setPaymentMethod('cash');
 
-    setState(() => _isProcessing = true);
+    final paymentId = state.paymentId;
+    if (paymentId.isNotEmpty) {
+      await _rideService.confirmPayment(paymentId);
+    }
 
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
-        Navigator.pushReplacementNamed(context, '/rating');
-      }
+    if (!mounted) return;
+    setState(() {
+      _isConfirming = false;
+      _isPaid = true;
     });
+
+    // Brief pause then go to rating
+    await Future.delayed(const Duration(milliseconds: 800));
+    if (mounted) {
+      Navigator.pushReplacementNamed(context, AppRouter.rating);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
+    // Prefer the authoritative backend amount; fall back to estimated while loading
+    final displayFare = _finalFare > 0 ? _finalFare : state.estimatedFare;
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: FadeTransition(
           opacity: _animCtrl,
@@ -70,9 +104,8 @@ class _PaymentScreenState extends State<PaymentScreen>
                           width: 80,
                           height: 80,
                           decoration: BoxDecoration(
-                            color: AppColors.primaryGreen.withValues(
-                              alpha: 0.1,
-                            ),
+                            color: AppColors.primaryGreen
+                                .withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(40),
                           ),
                           child: const Icon(
@@ -85,20 +118,21 @@ class _PaymentScreenState extends State<PaymentScreen>
                       const SizedBox(height: 24),
                       const Center(
                         child: Text(
-                          'Destination Reached!',
+                          "You've arrived!",
                           style: TextStyle(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w800,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
                             color: AppColors.textDark,
+                            letterSpacing: -0.3,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Center(
+                      const SizedBox(height: 6),
+                      const Center(
                         child: Text(
-                          'Choose your payment method',
+                          'Please pay the driver',
                           style: TextStyle(
-                            fontSize: 15,
+                            fontSize: 13,
                             color: AppColors.textMedium,
                           ),
                         ),
@@ -110,28 +144,26 @@ class _PaymentScreenState extends State<PaymentScreen>
                         width: double.infinity,
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: AppColors.primaryGreen.withValues(alpha: 0.06),
+                          color: AppColors.primaryGreen
+                              .withValues(alpha: 0.06),
                           borderRadius: BorderRadius.circular(18),
                           border: Border.all(
-                            color: AppColors.primaryGreen.withValues(
-                              alpha: 0.15,
-                            ),
+                            color: AppColors.primaryGreen
+                                .withValues(alpha: 0.15),
                           ),
                         ),
                         child: Column(
                           children: [
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              mainAxisAlignment:
+                                  MainAxisAlignment.spaceBetween,
                               children: [
-                                const Text(
-                                  'Ride Fare',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: AppColors.textMedium,
-                                  ),
-                                ),
+                                const Text('Ride Fare',
+                                    style: TextStyle(
+                                        fontSize: 14,
+                                        color: AppColors.textMedium)),
                                 Text(
-                                  '₹${state.estimatedFare.toStringAsFixed(0)}',
+                                  '₹${displayFare.toStringAsFixed(0)}',
                                   style: const TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600,
@@ -142,17 +174,15 @@ class _PaymentScreenState extends State<PaymentScreen>
                             ),
                             const SizedBox(height: 10),
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              mainAxisAlignment:
+                                  MainAxisAlignment.spaceBetween,
                               children: [
-                                const Text(
-                                  'Distance',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: AppColors.textMedium,
-                                  ),
-                                ),
+                                const Text('Distance',
+                                    style: TextStyle(
+                                        fontSize: 14,
+                                        color: AppColors.textMedium)),
                                 Text(
-                                  '${state.estimatedDistance} km',
+                                  '${state.estimatedDistance.toStringAsFixed(1)} km',
                                   style: const TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600,
@@ -165,7 +195,8 @@ class _PaymentScreenState extends State<PaymentScreen>
                             const Divider(),
                             const SizedBox(height: 8),
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              mainAxisAlignment:
+                                  MainAxisAlignment.spaceBetween,
                               children: [
                                 const Text(
                                   'Total',
@@ -176,7 +207,7 @@ class _PaymentScreenState extends State<PaymentScreen>
                                   ),
                                 ),
                                 Text(
-                                  '₹${state.estimatedFare.toStringAsFixed(0)}',
+                                  '₹${displayFare.toStringAsFixed(0)}',
                                   style: const TextStyle(
                                     fontSize: 22,
                                     fontWeight: FontWeight.w800,
@@ -189,42 +220,67 @@ class _PaymentScreenState extends State<PaymentScreen>
                         ),
                       ),
 
-                      const SizedBox(height: 32),
-                      const Text(
-                        'Payment Method',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textDark,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 28),
 
-                      // UPI Option
-                      _PaymentOption(
-                        icon: Icons.account_balance_wallet_rounded,
-                        title: 'UPI / Online Payment',
-                        subtitle: 'Pay via UPI, cards, or net banking',
-                        isSelected: _selectedMethod == 'upi',
-                        onTap: () => setState(() => _selectedMethod = 'upi'),
-                      ),
-                      const SizedBox(height: 12),
-                      // Cash Option
-                      _PaymentOption(
-                        icon: Icons.money_rounded,
-                        title: 'Offline Cash',
-                        subtitle: 'Pay cash directly to driver',
-                        isSelected: _selectedMethod == 'cash',
-                        onTap: () => setState(() => _selectedMethod = 'cash'),
+                      // Payment method — Cash only
+                      Container(
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryGreen
+                              .withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                              color: AppColors.primaryGreen, width: 2),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: AppColors.primaryGreen
+                                    .withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(Icons.money_rounded,
+                                  color: AppColors.primaryGreen, size: 24),
+                            ),
+                            const SizedBox(width: 14),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Cash Payment',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textDark,
+                                    ),
+                                  ),
+                                  SizedBox(height: 3),
+                                  Text(
+                                    'Pay cash directly to your driver',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: AppColors.textLight,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Icon(Icons.check_circle,
+                                color: AppColors.primaryGreen, size: 24),
+                          ],
+                        ),
                       ),
 
                       const Spacer(),
 
-                      if (_isProcessing)
-                        Center(
+                      if (_isConfirming)
+                        const Center(
                           child: Column(
                             children: [
-                              const SizedBox(
+                              SizedBox(
                                 width: 32,
                                 height: 32,
                                 child: CircularProgressIndicator(
@@ -234,14 +290,30 @@ class _PaymentScreenState extends State<PaymentScreen>
                                   ),
                                 ),
                               ),
-                              const SizedBox(height: 12),
+                              SizedBox(height: 12),
                               Text(
-                                _selectedMethod == 'cash'
-                                    ? 'Waiting for driver to confirm...'
-                                    : 'Processing payment...',
-                                style: const TextStyle(
+                                'Confirming payment...',
+                                style: TextStyle(
                                   fontSize: 14,
                                   color: AppColors.textMedium,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      else if (_isPaid)
+                        Center(
+                          child: Column(
+                            children: [
+                              const Icon(Icons.check_circle_rounded,
+                                  color: AppColors.primaryGreen, size: 48),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Payment confirmed!',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.primaryGreen,
                                 ),
                               ),
                             ],
@@ -252,21 +324,17 @@ class _PaymentScreenState extends State<PaymentScreen>
                           width: double.infinity,
                           height: 56,
                           child: ElevatedButton(
-                            onPressed: _selectedMethod != null
-                                ? _processPayment
-                                : null,
+                            onPressed: _confirmCashPayment,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primaryGreen,
                               foregroundColor: AppColors.white,
-                              disabledBackgroundColor: AppColors.divider,
+                              elevation: 0,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(16),
                               ),
                             ),
                             child: Text(
-                              _selectedMethod == 'cash'
-                                  ? 'Confirm Cash Payment'
-                                  : 'Pay ₹${state.estimatedFare.toStringAsFixed(0)}',
+                              'I\'ve paid  ₹${state.estimatedFare.toStringAsFixed(0)} cash',
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
@@ -281,94 +349,6 @@ class _PaymentScreenState extends State<PaymentScreen>
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PaymentOption extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _PaymentOption({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.primaryGreen.withValues(alpha: 0.06)
-              : AppColors.backgroundGrey,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected ? AppColors.primaryGreen : Colors.transparent,
-            width: 2,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? AppColors.primaryGreen.withValues(alpha: 0.1)
-                    : AppColors.white,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                icon,
-                color: isSelected
-                    ? AppColors.primaryGreen
-                    : AppColors.textMedium,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: isSelected
-                          ? AppColors.textDark
-                          : AppColors.textMedium,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textLight,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              isSelected ? Icons.check_circle : Icons.circle_outlined,
-              color: isSelected ? AppColors.primaryGreen : AppColors.textLight,
-              size: 24,
-            ),
-          ],
         ),
       ),
     );

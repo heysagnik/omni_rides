@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/app_state.dart';
 import '../theme/app_colors.dart';
+import '../routes/app_router.dart';
+import '../services/auth_service.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class AuthOptionsScreen extends StatefulWidget {
   const AuthOptionsScreen({super.key});
@@ -11,6 +16,7 @@ class AuthOptionsScreen extends StatefulWidget {
 class _AuthOptionsScreenState extends State<AuthOptionsScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animCtrl;
+  bool _isLoading = false;
   late Animation<double> _fadeIn;
   late Animation<Offset> _slideUp;
 
@@ -19,7 +25,7 @@ class _AuthOptionsScreenState extends State<AuthOptionsScreen>
     super.initState();
     _animCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 700),
     );
     _fadeIn = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
@@ -43,180 +49,168 @@ class _AuthOptionsScreenState extends State<AuthOptionsScreen>
     super.dispose();
   }
 
+  Future<void> _handleGoogleSignIn() async {
+    setState(() => _isLoading = true);
+    final authService = AuthService();
+    final result = await authService.signInWithGoogle();
+
+    if (!mounted) return;
+
+    if (result == null) {
+      // User cancelled or sign-in failed
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    // Sync with backend and route based on isNewUser
+    final appState = context.read<AppState>();
+    final route = await appState.syncWithBackend();
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    switch (route) {
+      case 'new_user':
+        Navigator.pushNamedAndRemoveUntil(
+            context, AppRouter.login, (r) => false);
+        break;
+      case 'home':
+        Navigator.pushNamedAndRemoveUntil(context, AppRouter.home, (r) => false);
+        break;
+      default:
+        // Backend unreachable but Firebase auth succeeded — go home
+        Navigator.pushNamedAndRemoveUntil(context, AppRouter.home, (r) => false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [AppColors.primaryGreen, Color(0xFF008A57)],
-          ),
-        ),
-        child: SafeArea(
+      backgroundColor: AppColors.white,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 28),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Spacer(flex: 2),
-              // Logo & Branding
+
+              // Brand mark
               FadeTransition(
                 opacity: _fadeIn,
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                      width: 100,
-                      height: 100,
+                      width: 56,
+                      height: 56,
                       decoration: BoxDecoration(
-                        color: AppColors.white,
-                        borderRadius: BorderRadius.circular(26),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.15),
-                            blurRadius: 30,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(16),
                       ),
                       child: const Icon(
                         Icons.local_taxi_rounded,
-                        size: 50,
-                        color: AppColors.primaryGreen,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      'RideApp',
-                      style: TextStyle(
-                        fontSize: 36,
-                        fontWeight: FontWeight.w800,
+                        size: 30,
                         color: AppColors.white,
-                        letterSpacing: 1.5,
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 48),
-                      child: Text(
-                        'Your app for fair deals.\nChoose rides that are right for you',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w400,
-                          color: AppColors.white.withValues(alpha: 0.85),
-                          height: 1.5,
-                        ),
+                    const SizedBox(height: 28),
+                    const Text(
+                      'Get in,\nlet\'s ride.',
+                      style: TextStyle(
+                        fontSize: 38,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textDark,
+                        height: 1.1,
+                        letterSpacing: -1.0,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      'Fair fares, no surge pricing.\nChoose rides that are right for you.',
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: AppColors.textMedium,
+                        height: 1.6,
                       ),
                     ),
                   ],
                 ),
               ),
+
               const Spacer(flex: 3),
-              // Auth Buttons
+
+              // CTA buttons
               SlideTransition(
                 position: _slideUp,
                 child: FadeTransition(
                   opacity: _fadeIn,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 28),
-                    child: Column(
-                      children: [
-                        // Sign Up with Google
-                        SizedBox(
-                          width: double.infinity,
-                          height: 54,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              Navigator.pushReplacementNamed(context, '/login');
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.white,
-                              foregroundColor: AppColors.textDark,
-                              elevation: 4,
-                              shadowColor: Colors.black.withValues(alpha: 0.15),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
+                  child: Column(
+                    children: [
+                      // Google Sign-In
+                      SizedBox(
+                        width: double.infinity,
+                        height: 54,
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _handleGoogleSignIn,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.textDark,
+                            foregroundColor: AppColors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Image.network(
-                                  'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg',
-                                  width: 22,
+                            elevation: 0,
+                          ),
+                          child: _isLoading
+                              ? const SizedBox(
                                   height: 22,
-                                  errorBuilder: (_, __, ___) => const Icon(
-                                    Icons.g_mobiledata_rounded,
-                                    size: 28,
-                                    color: AppColors.primaryGreen,
+                                  width: 22,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: AppColors.white,
                                   ),
+                                )
+                              : Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    SvgPicture.network(
+                                      'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg',
+                                      width: 20,
+                                      height: 20,
+                                      placeholderBuilder: (BuildContext context) => const Icon(
+                                        Icons.g_mobiledata_rounded,
+                                        size: 24,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    const Text(
+                                      'Continue with Google',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(width: 12),
-                                const Text(
-                                  'Sign Up with Google',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
                         ),
-                        const SizedBox(height: 16),
-                        // Login with Google
-                        SizedBox(
-                          width: double.infinity,
-                          height: 54,
-                          child: OutlinedButton(
-                            onPressed: () {
-                              Navigator.pushReplacementNamed(context, '/home');
-                            },
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.white,
-                              side: BorderSide(
-                                color: AppColors.white.withValues(alpha: 0.7),
-                                width: 1.5,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.g_mobiledata_rounded,
-                                  size: 28,
-                                  color: AppColors.white.withValues(alpha: 0.9),
-                                ),
-                                const SizedBox(width: 10),
-                                const Text(
-                                  'Login with Google',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                      ),
+
+                      const SizedBox(height: 32),
+
+                      Text(
+                        'By continuing, you agree to our Terms of Service\nand Privacy Policy.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textLight,
+                          height: 1.6,
                         ),
-                        const SizedBox(height: 24),
-                        Text(
-                          'By continuing, you agree to our Terms & Privacy Policy',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.white.withValues(alpha: 0.55),
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ),
+
               const SizedBox(height: 40),
             ],
           ),

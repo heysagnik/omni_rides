@@ -1,4 +1,4 @@
-package com.rideapp.user_app
+package com.omni.user
 
 import io.flutter.embedding.android.FlutterActivity
 

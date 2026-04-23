@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
 import '../theme/app_colors.dart';
 import '../widgets/primary_button.dart';
+import '../routes/app_router.dart';
+import '../services/location_service.dart';
 
 class LocationPermissionScreen extends StatefulWidget {
   const LocationPermissionScreen({super.key});
@@ -15,6 +17,7 @@ class LocationPermissionScreen extends StatefulWidget {
 class _LocationPermissionScreenState extends State<LocationPermissionScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animCtrl;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -31,15 +34,41 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
     super.dispose();
   }
 
-  void _enableLocation() {
-    context.read<AppState>().enableLocation();
-    context.read<AppState>().loadDemoData();
-    Navigator.pushReplacementNamed(context, '/home');
+  Future<void> _enableLocation() async {
+    setState(() => _isLoading = true);
+    final granted = await LocationService.requestPermission();
+    if (!mounted) return;
+
+    if (granted) {
+      final position = await LocationService.getCurrentPosition();
+      if (!mounted) return;
+
+      if (position != null) {
+        final address = await LocationService.getAddressFromLatLng(
+          position.latitude,
+          position.longitude,
+        );
+        if (mounted) {
+          final displayAddress =
+              address.isNotEmpty ? address : 'Current Location';
+          context.read<AppState>().updateCurrentLocation(
+                position.latitude,
+                position.longitude,
+                displayAddress,
+              );
+        }
+      }
+    }
+
+    if (mounted) {
+      context.read<AppState>().enableLocation();
+      Navigator.pushNamedAndRemoveUntil(
+          context, AppRouter.home, (route) => false);
+    }
   }
 
   void _skip() {
-    context.read<AppState>().loadDemoData();
-    Navigator.pushReplacementNamed(context, '/home');
+    Navigator.pushNamedAndRemoveUntil(context, AppRouter.home, (route) => false);
   }
 
   @override
@@ -69,24 +98,23 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
                 ),
                 const SizedBox(height: 40),
                 const Text(
-                  'Turn your\nlocation on',
+                  'Enable location',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
                     color: AppColors.textDark,
-                    height: 1.2,
+                    letterSpacing: -0.3,
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Text(
-                    'We need your location to find nearby drivers, '
-                    'pinpoint your pickup, and estimate ride times accurately.',
+                    'We use your location to find nearby drivers and set your pickup point.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 15,
+                      fontSize: 13,
                       color: AppColors.textMedium,
                       height: 1.6,
                     ),
@@ -96,7 +124,8 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
                 PrimaryButton(
                   text: 'Enable location services',
                   icon: Icons.my_location_rounded,
-                  onPressed: _enableLocation,
+                  isLoading: _isLoading,
+                  onPressed: () => _enableLocation(),
                 ),
                 const SizedBox(height: 16),
                 SizedBox(

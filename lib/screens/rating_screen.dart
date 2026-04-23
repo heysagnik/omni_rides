@@ -4,6 +4,8 @@ import '../providers/app_state.dart';
 import '../theme/app_colors.dart';
 import '../widgets/star_rating.dart';
 import '../widgets/primary_button.dart';
+import '../routes/app_router.dart';
+import '../services/ride_service.dart';
 
 class RatingScreen extends StatefulWidget {
   const RatingScreen({super.key});
@@ -52,14 +54,27 @@ class _RatingScreenState extends State<RatingScreen>
     super.dispose();
   }
 
-  void _submit() {
+  void _submit() async {
     if (_rating == 0) return;
-    context.read<AppState>().submitRating(_rating);
+    
+    // Show a loading state if we want, or just wait locally
     setState(() => _submitted = true);
+    
+    final state = context.read<AppState>();
+    final rideService = RideService();
+    
+    // Use the live rideId from state — this is the real backend UUID
+    final rideId = state.rideId;
+    if (rideId.isNotEmpty) {
+      rideService.rateRide(rideId, _rating, null);
+    }
+    
+    // Also save locally
+    state.submitRating(_rating);
 
     Future.delayed(const Duration(milliseconds: 1500), () {
       if (mounted) {
-        Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+        Navigator.pushNamedAndRemoveUntil(context, AppRouter.home, (route) => false);
       }
     });
   }
@@ -118,21 +133,22 @@ class _RatingScreenState extends State<RatingScreen>
                       child: Column(
                         children: [
                           Text(
-                            _submitted ? 'Thank you!' : 'Ride Successful!',
+                            _submitted ? 'Thanks!' : 'Ride complete',
                             style: const TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w800,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
                               color: AppColors.textDark,
+                              letterSpacing: -0.3,
                             ),
                           ),
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 8),
                           Text(
                             _submitted
                                 ? 'Redirecting to home...'
                                 : 'How was your ride with ${state.driverName.isNotEmpty ? state.driverName : "your driver"}?',
                             textAlign: TextAlign.center,
                             style: const TextStyle(
-                              fontSize: 15,
+                              fontSize: 13,
                               color: AppColors.textMedium,
                               height: 1.5,
                             ),

@@ -56,7 +56,7 @@ class DriverInfoCard extends StatelessWidget {
                     Text(
                       name,
                       style: const TextStyle(
-                        fontSize: 18,
+                        fontSize: 15,
                         fontWeight: FontWeight.w700,
                         color: AppColors.textDark,
                       ),
@@ -65,7 +65,7 @@ class DriverInfoCard extends StatelessWidget {
                     Text(
                       '$vehicle  •  $plate',
                       style: const TextStyle(
-                        fontSize: 14,
+                        fontSize: 13,
                         color: AppColors.textMedium,
                       ),
                     ),
@@ -85,7 +85,7 @@ class DriverInfoCard extends StatelessWidget {
                       Text(
                         rating.toStringAsFixed(1),
                         style: const TextStyle(
-                          fontSize: 16,
+                          fontSize: 14,
                           fontWeight: FontWeight.w700,
                           color: AppColors.textDark,
                         ),

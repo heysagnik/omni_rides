@@ -5,6 +5,10 @@ import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
 import '../theme/app_colors.dart';
+import '../routes/app_router.dart';
+import '../services/ride_service.dart';
+import '../services/safety_service.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 class InTransitScreen extends StatefulWidget {
   const InTransitScreen({super.key});
@@ -14,29 +18,124 @@ class InTransitScreen extends StatefulWidget {
 }
 
 class _InTransitScreenState extends State<InTransitScreen> {
-  Timer? _timer;
-  int _elapsedSeconds = 0;
+  Timer? _pollTimer;
+  Timer? _etaTimer;
+  int _etaMinutes = 0;
+  double _distanceKm = 0;
+  double _progress = 0;
+  int _originalEta = 0;
+  final RideService _rideService = RideService();
+  final SafetyService _safetyService = SafetyService();
 
   @override
   void initState() {
     super.initState();
-    // Simulate ride progress
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (mounted) {
-        setState(() => _elapsedSeconds++);
-        // Simulate ride completion after 10 seconds
-        if (_elapsedSeconds >= 10) {
-          timer.cancel();
-          context.read<AppState>().completeRide();
-          Navigator.pushReplacementNamed(context, '/payment');
-        }
+    final state = context.read<AppState>();
+    _etaMinutes = state.etaMinutes;
+    _originalEta = state.etaMinutes;
+    _distanceKm = state.estimatedDistance;
+    _startPolling();
+    _startEtaPolling();
+  }
+
+  // Poll ride status every 5 s to detect ride_completed
+  void _startPolling() {
+    final rideId = context.read<AppState>().rideId;
+    if (rideId.isEmpty) return;
+
+    _pollTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
+      if (!mounted) { timer.cancel(); return; }
+
+      final details = await _rideService.getRideDetails(rideId);
+      if (!mounted || details == null) return;
+
+      final status = (details['status'] as String?) ?? '';
+      if (status == 'ride_completed') {
+        timer.cancel();
+        _etaTimer?.cancel();
+        context.read<AppState>().completeRide();
+        if (mounted) Navigator.pushReplacementNamed(context, AppRouter.payment);
       }
     });
   }
 
+  // Poll dedicated ETA endpoint every 30 s (doc section 4.9)
+  void _startEtaPolling() {
+    final rideId = context.read<AppState>().rideId;
+    if (rideId.isEmpty) return;
+
+    _fetchEta(rideId); // immediate first fetch
+    _etaTimer = Timer.periodic(const Duration(seconds: 30), (_) => _fetchEta(rideId));
+  }
+
+  Future<void> _fetchEta(String rideId) async {
+    final eta = await _rideService.getEta(rideId);
+    if (!mounted || eta == null) return;
+    final mins = (eta['etaMinutes'] as num?)?.toInt() ?? _etaMinutes;
+    final dist = (eta['distanceKm'] as num?)?.toDouble() ?? _distanceKm;
+    if (_originalEta == 0 && mins > 0) _originalEta = mins;
+    setState(() {
+      _etaMinutes = mins;
+      _distanceKm = dist;
+      if (_originalEta > 0) {
+        _progress = (1 - mins / _originalEta).clamp(0.0, 1.0);
+      }
+    });
+  }
+
+  void _showSosDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Send SOS?',
+            style: TextStyle(fontWeight: FontWeight.w700)),
+        content: const Text(
+          'This will alert your emergency contacts with your current location.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: AppColors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final state = context.read<AppState>();
+              final ok = await _safetyService.triggerSos(
+                rideId: state.rideId.isNotEmpty ? state.rideId : null,
+                lat: state.driverLat != 0 ? state.driverLat : null,
+                lng: state.driverLng != 0 ? state.driverLng : null,
+              );
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(ok
+                        ? 'SOS sent to emergency contacts.'
+                        : 'Failed to send SOS. Try again.'),
+                    backgroundColor: ok ? AppColors.error : AppColors.textMedium,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            },
+            child: const Text('Send SOS'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   void dispose() {
-    _timer?.cancel();
+    _pollTimer?.cancel();
+    _etaTimer?.cancel();
     super.dispose();
   }
 
@@ -44,15 +143,19 @@ class _InTransitScreenState extends State<InTransitScreen> {
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
 
-    // Simulate moving position along route
-    double progress = (_elapsedSeconds / 10).clamp(0.0, 1.0);
-    double carLat =
-        state.pickupLat + (state.destinationLat - state.pickupLat) * progress;
-    double carLng =
-        state.pickupLng + (state.destinationLng - state.pickupLng) * progress;
-    int remainingMin = ((1 - progress) * state.etaMinutes).ceil().clamp(0, 99);
+    // Use polling values or fall back to state
+    final displayEta = _etaMinutes > 0 ? _etaMinutes : state.etaMinutes;
+    final displayDist = _distanceKm > 0 ? _distanceKm : state.estimatedDistance;
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) {
+          Navigator.pushNamedAndRemoveUntil(
+              context, AppRouter.home, (route) => false);
+        }
+      },
+      child: Scaffold(
       body: Stack(
         children: [
           // Map with route
@@ -67,7 +170,7 @@ class _InTransitScreenState extends State<InTransitScreen> {
             children: [
               TileLayer(
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.rideapp.user_app',
+                userAgentPackageName: 'com.omni.user_app',
               ),
               PolylineLayer(
                 polylines: [
@@ -95,7 +198,6 @@ class _InTransitScreenState extends State<InTransitScreen> {
               ),
               MarkerLayer(
                 markers: [
-                  // Pickup marker
                   Marker(
                     point: LatLng(state.pickupLat, state.pickupLng),
                     width: 20,
@@ -108,46 +210,45 @@ class _InTransitScreenState extends State<InTransitScreen> {
                       ),
                     ),
                   ),
-                  // Destination marker
                   Marker(
                     point: LatLng(state.destinationLat, state.destinationLng),
                     width: 28,
                     height: 28,
                     child: const Icon(
-                      Icons.location_on,
+                      PhosphorIconsFill.mapPin,
                       color: AppColors.error,
                       size: 28,
                     ),
                   ),
-                  // Car marker (moving)
-                  Marker(
-                    point: LatLng(carLat, carLng),
-                    width: 44,
-                    height: 44,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.15),
-                            blurRadius: 8,
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.directions_car,
-                        color: AppColors.primaryGreen,
-                        size: 24,
+                  if (state.driverLat != 0)
+                    Marker(
+                      point: LatLng(state.driverLat, state.driverLng),
+                      width: 44,
+                      height: 44,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.15),
+                              blurRadius: 8,
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          PhosphorIconsRegular.car,
+                          color: AppColors.primaryGreen,
+                          size: 24,
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ],
           ),
 
-          // Top ETA Bar
+          // Top ETA / Distance bar
           Positioned(
             top: MediaQuery.of(context).padding.top + 12,
             left: 16,
@@ -157,10 +258,11 @@ class _InTransitScreenState extends State<InTransitScreen> {
               decoration: BoxDecoration(
                 color: AppColors.white,
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: [
+                boxShadow: const [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 16,
+                    color: Color(0x0A000000),
+                    blurRadius: 24,
+                    offset: Offset(0, 4),
                   ),
                 ],
               ),
@@ -173,7 +275,7 @@ class _InTransitScreenState extends State<InTransitScreen> {
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(
-                      Icons.navigation_rounded,
+                      PhosphorIconsRegular.navigationArrow,
                       color: AppColors.primaryGreen,
                       size: 22,
                     ),
@@ -192,7 +294,7 @@ class _InTransitScreenState extends State<InTransitScreen> {
                           ),
                         ),
                         Text(
-                          'Arriving in ~$remainingMin min',
+                          '~$displayEta min  •  ${displayDist.toStringAsFixed(1)} km',
                           style: const TextStyle(
                             fontSize: 13,
                             color: AppColors.textMedium,
@@ -203,15 +305,13 @@ class _InTransitScreenState extends State<InTransitScreen> {
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
-                    ),
+                        horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
                       color: AppColors.primaryGreen,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
-                      '$remainingMin min',
+                      '$displayEta min',
                       style: const TextStyle(
                         color: AppColors.white,
                         fontSize: 14,
@@ -220,6 +320,41 @@ class _InTransitScreenState extends State<InTransitScreen> {
                     ),
                   ),
                 ],
+              ),
+            ),
+          ),
+
+          // SOS button (floating)
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 84,
+            right: 16,
+            child: GestureDetector(
+              onTap: _showSosDialog,
+              child: Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: AppColors.error,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.error.withValues(alpha: 0.25),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Center(
+                  child: Text(
+                    'SOS',
+                    style: TextStyle(
+                      color: AppColors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
@@ -236,11 +371,11 @@ class _InTransitScreenState extends State<InTransitScreen> {
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(28),
                 ),
-                boxShadow: [
+                boxShadow: const [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 20,
-                    offset: const Offset(0, -4),
+                    color: Color(0x0A000000),
+                    blurRadius: 32,
+                    offset: Offset(0, -8),
                   ),
                 ],
               ),
@@ -251,7 +386,7 @@ class _InTransitScreenState extends State<InTransitScreen> {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(4),
                     child: LinearProgressIndicator(
-                      value: progress,
+                      value: _progress,
                       backgroundColor: AppColors.backgroundGrey,
                       valueColor: const AlwaysStoppedAnimation<Color>(
                         AppColors.primaryGreen,
@@ -264,11 +399,10 @@ class _InTransitScreenState extends State<InTransitScreen> {
                     children: [
                       CircleAvatar(
                         radius: 24,
-                        backgroundColor: AppColors.primaryGreen.withValues(
-                          alpha: 0.15,
-                        ),
+                        backgroundColor:
+                            AppColors.primaryGreen.withValues(alpha: 0.15),
                         child: const Icon(
-                          Icons.person,
+                          PhosphorIconsRegular.user,
                           color: AppColors.primaryGreen,
                         ),
                       ),
@@ -297,11 +431,8 @@ class _InTransitScreenState extends State<InTransitScreen> {
                       ),
                       Row(
                         children: [
-                          const Icon(
-                            Icons.star_rounded,
-                            color: AppColors.starFilled,
-                            size: 18,
-                          ),
+                          const Icon(PhosphorIconsFill.star,
+                              color: AppColors.starFilled, size: 18),
                           const SizedBox(width: 4),
                           Text(
                             state.driverRating.toStringAsFixed(1),
@@ -316,47 +447,64 @@ class _InTransitScreenState extends State<InTransitScreen> {
                   ),
                   const SizedBox(height: 16),
                   const Divider(),
-                  const SizedBox(height: 12),
+                  // Route summary
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(
-                        Icons.circle,
-                        color: AppColors.primaryGreen,
-                        size: 10,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          state.pickupAddress,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: AppColors.textMedium,
+                      Column(
+                        children: [
+                          Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: AppColors.white,
+                              border: Border.all(color: AppColors.primaryGreen, width: 2.5),
+                            ),
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.location_on,
-                        color: AppColors.error,
-                        size: 14,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          state.destinationAddress,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: AppColors.textDark,
-                            fontWeight: FontWeight.w500,
+                          Container(
+                            width: 1.5,
+                            height: 24,
+                            margin: const EdgeInsets.symmetric(vertical: 4),
+                            color: AppColors.divider,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          Container(
+                            width: 10,
+                            height: 10,
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: AppColors.error,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              state.pickupAddress,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textDark,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 18),
+                            Text(
+                              state.destinationAddress,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textDark,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -367,6 +515,7 @@ class _InTransitScreenState extends State<InTransitScreen> {
           ),
         ],
       ),
-    );
+    ),   // Scaffold
+    );   // PopScope
   }
 }
