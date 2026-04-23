@@ -7,53 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:616828888404:android:14bbd7480ff9d5885454c1",
+        "mobilesdk_app_id": "1:616828888404:android:1ebfd99dfc1c16b65454c1",
         "android_client_info": {
-          "package_name": "com.omni.driver"
-        }
-      },
-      "oauth_client": [
-        {
-          "client_id": "616828888404-lrejvc9t6t1lbh5v60um8fhdls0d8uhc.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.omni.driver",
-            "certificate_hash": "fa12bf56d8aae0d9db92251a6dbec444f518add3"
-          }
-        },
-        {
-          "client_id": "616828888404-867alt8er3tts7opvpt147rpldeuli7b.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyAoYwI3Nn-xC-faaeBKz6XeZIaUQfT7aM4"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "616828888404-867alt8er3tts7opvpt147rpldeuli7b.apps.googleusercontent.com",
-              "client_type": 3
-            },
-            {
-              "client_id": "616828888404-0gdprr7g5ie1eh1l784tbg5bulrrq0ch.apps.googleusercontent.com",
-              "client_type": 2,
-              "ios_info": {
-                "bundle_id": "com.omni.driver"
-              }
-            }
-          ]
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:616828888404:android:cab5cf042fcfd0eb5454c1",
-        "android_client_info": {
-          "package_name": "com.omni.user"
+          "package_name": "com.omni.rides"
         }
       },
       "oauth_client": [
