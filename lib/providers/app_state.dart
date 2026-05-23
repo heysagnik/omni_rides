@@ -152,6 +152,24 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void swapPickupAndDestination() {
+    final tempAddr = _pickupAddress;
+    final tempLat = _pickupLat;
+    final tempLng = _pickupLng;
+
+    _pickupAddress = _destinationAddress;
+    _pickupLat = _destinationLat;
+    _pickupLng = _destinationLng;
+
+    _destinationAddress = tempAddr;
+    _destinationLat = tempLat;
+    _destinationLng = tempLng;
+
+    _estimatedDistance = _approxDistanceKm(_destinationLat, _destinationLng);
+    _estimatedFare = 0;
+    notifyListeners();
+  }
+
   void setEstimatedFare(double fare) {
     _estimatedFare = fare;
     notifyListeners();

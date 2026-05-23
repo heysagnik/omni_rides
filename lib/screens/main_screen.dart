@@ -16,6 +16,7 @@ class MainScreen extends StatelessWidget {
         state.rideStatus == 'searching';
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           const HomeScreen(),

@@ -26,6 +26,7 @@ class _RouteSelectionScreenState extends State<RouteSelectionScreen> {
   bool _isSearching = false;
   List<Map<String, dynamic>> _suggestions = [];
   Timer? _debounce;
+  double _swapAngle = 0.0;
 
   @override
   void initState() {
@@ -136,28 +137,32 @@ class _RouteSelectionScreenState extends State<RouteSelectionScreen> {
   Widget build(BuildContext context) {
     final bottomPad = MediaQuery.of(context).viewInsets.bottom;
 
-    return Scaffold(
-      backgroundColor: AppColors.white,
-      body: Column(
-        children: [
-          // ── Header ────────────────────────────────────────────────────────
-          Container(
-            color: AppColors.white,
-            child: SafeArea(
-              bottom: false,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Back + title row
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(4, 8, 16, 0),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          onPressed: () => Navigator.pop(context),
-                          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-                          color: AppColors.textDark,
-                        ),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        Navigator.pushNamedAndRemoveUntil(context, AppRouter.home, (route) => false);
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.white,
+        body: Column(
+          children: [
+            Container(
+              color: AppColors.white,
+              child: SafeArea(
+                bottom: false,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(4, 8, 16, 0),
+                      child: Row(
+                        children: [
+                          IconButton(
+                            onPressed: () => Navigator.pushNamedAndRemoveUntil(context, AppRouter.home, (route) => false),
+                            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+                            color: AppColors.textDark,
+                          ),
                         const Text(
                           'Plan your ride',
                           style: TextStyle(
@@ -173,7 +178,6 @@ class _RouteSelectionScreenState extends State<RouteSelectionScreen> {
 
                   const SizedBox(height: 16),
 
-                  // Route input card
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                     child: Container(
@@ -183,58 +187,18 @@ class _RouteSelectionScreenState extends State<RouteSelectionScreen> {
                         border: Border.all(color: AppColors.border),
                       ),
                       child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          // Timeline indicator
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(18, 20, 12, 20),
-                            child: Column(
-                              children: [
-                                Container(
-                                  width: 11,
-                                  height: 11,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: AppColors.white,
-                                    border: Border.all(color: AppColors.primary, width: 2.5),
-                                  ),
-                                ),
-                                Container(
-                                  width: 2,
-                                  height: 28,
-                                  margin: const EdgeInsets.symmetric(vertical: 5),
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topCenter,
-                                      end: Alignment.bottomCenter,
-                                      colors: [AppColors.primary, AppColors.error],
-                                    ),
-                                    borderRadius: BorderRadius.circular(1),
-                                  ),
-                                ),
-                                Container(
-                                  width: 11,
-                                  height: 11,
-                                  decoration: const BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: AppColors.error,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          // Input fields
                           Expanded(
                             child: Column(
                               children: [
-                                // Pickup
                                 _InputField(
                                   controller: _pickupCtrl,
                                   focusNode: _pickupFocus,
                                   hint: 'Pickup location',
                                   isActive: _activeField == 'pickup',
                                   readOnly: _isFetchingLocation,
+                                  dotColor: AppColors.primary,
                                   onChanged: _onTextChanged,
                                   trailing: _isFetchingLocation
                                       ? const SizedBox(
@@ -250,26 +214,29 @@ class _RouteSelectionScreenState extends State<RouteSelectionScreen> {
                                         ),
                                 ),
                                 Divider(height: 1, color: AppColors.border),
-                                // Destination
                                 _InputField(
                                   controller: _destCtrl,
                                   focusNode: _destFocus,
                                   hint: 'Where to?',
                                   isActive: _activeField == 'destination',
+                                  dotColor: AppColors.error,
                                   onChanged: _onTextChanged,
                                 ),
                               ],
                             ),
                           ),
 
-                          // Swap button
                           Padding(
-                            padding: const EdgeInsets.fromLTRB(0, 14, 12, 0),
+                            padding: const EdgeInsets.only(right: 12),
                             child: GestureDetector(
                               onTap: () {
-                                final tmp = _pickupCtrl.text;
-                                _pickupCtrl.text = _destCtrl.text;
-                                _destCtrl.text = tmp;
+                                setState(() {
+                                  _swapAngle += 180.0;
+                                  final tmp = _pickupCtrl.text;
+                                  _pickupCtrl.text = _destCtrl.text;
+                                  _destCtrl.text = tmp;
+                                });
+                                context.read<AppState>().swapPickupAndDestination();
                               },
                               child: Container(
                                 width: 32,
@@ -279,8 +246,19 @@ class _RouteSelectionScreenState extends State<RouteSelectionScreen> {
                                   shape: BoxShape.circle,
                                   border: Border.all(color: AppColors.border),
                                 ),
-                                child: const Icon(Icons.swap_vert_rounded,
-                                    size: 18, color: AppColors.textMedium),
+                                child: TweenAnimationBuilder<double>(
+                                  tween: Tween<double>(begin: 0, end: _swapAngle * (3.141592653589793 / 180.0)),
+                                  duration: const Duration(milliseconds: 350),
+                                  curve: Curves.easeInOutBack,
+                                  builder: (context, value, child) {
+                                    return Transform.rotate(
+                                      angle: value,
+                                      child: child,
+                                    );
+                                  },
+                                  child: const Icon(Icons.swap_vert_rounded,
+                                      size: 18, color: AppColors.textMedium),
+                                ),
                               ),
                             ),
                           ),
@@ -295,7 +273,6 @@ class _RouteSelectionScreenState extends State<RouteSelectionScreen> {
 
           const Divider(height: 1, color: AppColors.divider),
 
-          // ── Suggestions ───────────────────────────────────────────────────
           Expanded(
             child: _isSearching
                 ? const Center(
@@ -365,7 +342,6 @@ class _RouteSelectionScreenState extends State<RouteSelectionScreen> {
                       ),
           ),
 
-          // ── Confirm button ────────────────────────────────────────────────
           AnimatedSize(
             duration: const Duration(milliseconds: 220),
             curve: Curves.easeOutCubic,
@@ -401,6 +377,7 @@ class _RouteSelectionScreenState extends State<RouteSelectionScreen> {
           ),
         ],
       ),
+      )
     );
   }
 }
@@ -411,6 +388,7 @@ class _InputField extends StatelessWidget {
   final String hint;
   final bool isActive;
   final bool readOnly;
+  final Color dotColor;
   final ValueChanged<String>? onChanged;
   final Widget? trailing;
 
@@ -419,6 +397,7 @@ class _InputField extends StatelessWidget {
     required this.focusNode,
     required this.hint,
     required this.isActive,
+    required this.dotColor,
     this.readOnly = false,
     this.onChanged,
     this.trailing,
@@ -434,6 +413,14 @@ class _InputField extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Row(
         children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 6, right: 12),
+            child: Icon(
+              Icons.circle,
+              color: dotColor,
+              size: 8,
+            ),
+          ),
           Expanded(
             child: TextField(
               controller: controller,

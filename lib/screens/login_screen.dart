@@ -122,6 +122,7 @@ class _LoginScreenState extends State<LoginScreen>
                         TextFormField(
                           controller: _nameCtrl,
                           textCapitalization: TextCapitalization.words,
+                          textInputAction: TextInputAction.next,
                           decoration: _inputDecoration(
                               hint: 'e.g. Priya Sharma',
                               icon: Icons.person_rounded),
@@ -132,6 +133,8 @@ class _LoginScreenState extends State<LoginScreen>
                         TextFormField(
                           controller: _phoneCtrl,
                           keyboardType: TextInputType.phone,
+                          textInputAction: TextInputAction.done,
+                          onFieldSubmitted: (_) => _isLoading ? null : _save(),
                           decoration: _inputDecoration(
                             hint: '9876543210',
                             icon: Icons.phone_rounded,

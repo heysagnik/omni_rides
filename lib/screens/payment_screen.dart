@@ -17,6 +17,7 @@ class _PaymentScreenState extends State<PaymentScreen>
   bool _isConfirming = false;
   bool _isPaid = false;
   double _finalFare = 0; // authoritative amount from GET /payment/:rideId
+  String _selectedMethod = 'cash';
 
   late AnimationController _animCtrl;
   final RideService _rideService = RideService();
@@ -55,11 +56,11 @@ class _PaymentScreenState extends State<PaymentScreen>
     }
   }
 
-  Future<void> _confirmCashPayment() async {
+  Future<void> _confirmPayment() async {
     setState(() => _isConfirming = true);
 
     final state = context.read<AppState>();
-    state.setPaymentMethod('cash');
+    state.setPaymentMethod(_selectedMethod);
 
     final paymentId = state.paymentId;
     if (paymentId.isNotEmpty) {
@@ -139,7 +140,6 @@ class _PaymentScreenState extends State<PaymentScreen>
                       ),
                       const SizedBox(height: 32),
 
-                      // Fare Summary
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(20),
@@ -222,56 +222,206 @@ class _PaymentScreenState extends State<PaymentScreen>
 
                       const SizedBox(height: 28),
 
-                      // Payment method — Cash only
-                      Container(
-                        padding: const EdgeInsets.all(18),
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryGreen
-                              .withValues(alpha: 0.06),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                              color: AppColors.primaryGreen, width: 2),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
+                      Column(
+                        children: [
+                          GestureDetector(
+                            onTap: () => setState(() => _selectedMethod = 'cash'),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
-                                color: AppColors.primaryGreen
-                                    .withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(12),
+                                color: _selectedMethod == 'cash'
+                                    ? AppColors.primaryGreen.withValues(alpha: 0.05)
+                                    : AppColors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: _selectedMethod == 'cash'
+                                      ? AppColors.primaryGreen
+                                      : AppColors.border,
+                                  width: _selectedMethod == 'cash' ? 2 : 1,
+                                ),
                               ),
-                              child: const Icon(Icons.money_rounded,
-                                  color: AppColors.primaryGreen, size: 24),
-                            ),
-                            const SizedBox(width: 14),
-                            const Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                              child: Row(
                                 children: [
-                                  Text(
-                                    'Cash Payment',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.textDark,
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primaryGreen.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: const Icon(Icons.money_rounded,
+                                        color: AppColors.primaryGreen, size: 24),
+                                  ),
+                                  const SizedBox(width: 14),
+                                  const Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Cash Payment',
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors.textDark,
+                                          ),
+                                        ),
+                                        SizedBox(height: 3),
+                                        Text(
+                                          'Pay cash directly to your driver',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: AppColors.textMedium,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                  SizedBox(height: 3),
-                                  Text(
-                                    'Pay cash directly to your driver',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: AppColors.textLight,
-                                    ),
+                                  Icon(
+                                    _selectedMethod == 'cash'
+                                        ? Icons.check_circle
+                                        : Icons.circle_outlined,
+                                    color: _selectedMethod == 'cash'
+                                        ? AppColors.primaryGreen
+                                        : AppColors.textLight,
+                                    size: 22,
                                   ),
                                 ],
                               ),
                             ),
-                            const Icon(Icons.check_circle,
-                                color: AppColors.primaryGreen, size: 24),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(height: 12),
+                          GestureDetector(
+                            onTap: () => setState(() => _selectedMethod = 'upi'),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: _selectedMethod == 'upi'
+                                    ? AppColors.primaryGreen.withValues(alpha: 0.05)
+                                    : AppColors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: _selectedMethod == 'upi'
+                                      ? AppColors.primaryGreen
+                                      : AppColors.border,
+                                  width: _selectedMethod == 'upi' ? 2 : 1,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.info.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: const Icon(Icons.qr_code_2_rounded,
+                                        color: AppColors.info, size: 24),
+                                  ),
+                                  const SizedBox(width: 14),
+                                  const Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'UPI Pay (GPay / PhonePe)',
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors.textDark,
+                                          ),
+                                        ),
+                                        SizedBox(height: 3),
+                                        Text(
+                                          'Sandbox Testing • Fast digital payment',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: AppColors.textMedium,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Icon(
+                                    _selectedMethod == 'upi'
+                                        ? Icons.check_circle
+                                        : Icons.circle_outlined,
+                                    color: _selectedMethod == 'upi'
+                                        ? AppColors.primaryGreen
+                                        : AppColors.textLight,
+                                    size: 22,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          GestureDetector(
+                            onTap: () => setState(() => _selectedMethod = 'card'),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: _selectedMethod == 'card'
+                                    ? AppColors.primaryGreen.withValues(alpha: 0.05)
+                                    : AppColors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: _selectedMethod == 'card'
+                                      ? AppColors.primaryGreen
+                                      : AppColors.border,
+                                  width: _selectedMethod == 'card' ? 2 : 1,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: Colors.purple.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: const Icon(Icons.credit_card_rounded,
+                                        color: Colors.purple, size: 24),
+                                  ),
+                                  const SizedBox(width: 14),
+                                  const Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Credit or Debit Card',
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors.textDark,
+                                          ),
+                                        ),
+                                        SizedBox(height: 3),
+                                        Text(
+                                          'Sandbox Testing • Visa, Mastercard, RuPay',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: AppColors.textMedium,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Icon(
+                                    _selectedMethod == 'card'
+                                        ? Icons.check_circle
+                                        : Icons.circle_outlined,
+                                    color: _selectedMethod == 'card'
+                                        ? AppColors.primaryGreen
+                                        : AppColors.textLight,
+                                    size: 22,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
 
                       const Spacer(),
@@ -324,7 +474,7 @@ class _PaymentScreenState extends State<PaymentScreen>
                           width: double.infinity,
                           height: 56,
                           child: ElevatedButton(
-                            onPressed: _confirmCashPayment,
+                            onPressed: _confirmPayment,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primaryGreen,
                               foregroundColor: AppColors.white,
@@ -334,7 +484,9 @@ class _PaymentScreenState extends State<PaymentScreen>
                               ),
                             ),
                             child: Text(
-                              'I\'ve paid  ₹${state.estimatedFare.toStringAsFixed(0)} cash',
+                              _selectedMethod == 'cash'
+                                  ? 'I\'ve paid ₹${displayFare.toStringAsFixed(0)} cash'
+                                  : 'Pay ₹${displayFare.toStringAsFixed(0)} via ${_selectedMethod.toUpperCase()}',
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,

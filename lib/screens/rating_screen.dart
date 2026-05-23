@@ -79,6 +79,11 @@ class _RatingScreenState extends State<RatingScreen>
     });
   }
 
+  void _skip() {
+    context.read<AppState>().resetRide();
+    Navigator.pushNamedAndRemoveUntil(context, AppRouter.home, (route) => false);
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
@@ -93,6 +98,24 @@ class _RatingScreenState extends State<RatingScreen>
                 hasScrollBody: false,
                 child: Column(
                   children: [
+                    if (!_submitted)
+                      Align(
+                        alignment: Alignment.topRight,
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: TextButton(
+                            onPressed: _skip,
+                            child: const Text(
+                              'Skip',
+                              style: TextStyle(
+                                color: AppColors.textMedium,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                     const Spacer(flex: 2),
                     // Success Checkmark
                     ScaleTransition(

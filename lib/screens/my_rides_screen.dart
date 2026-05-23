@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../providers/app_state.dart';
 import '../theme/app_colors.dart';
 import '../services/ride_service.dart';
+
+import '../routes/app_router.dart';
 
 class MyRidesScreen extends StatefulWidget {
   const MyRidesScreen({super.key});
@@ -41,22 +44,20 @@ class _MyRidesScreenState extends State<MyRidesScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-          color: AppColors.textDark,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 8.0),
+          child: IconButton(
+            onPressed: () => Navigator.pop(context),
+            icon: const Icon(PhosphorIconsRegular.caretLeft, size: 24),
+            color: AppColors.textDark,
+          ),
         ),
         title: const Text(
           'Activity',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textDark,
-            letterSpacing: -0.6,
-          ),
+          
         ),
         titleSpacing: 0,
       ),
@@ -70,19 +71,19 @@ class _MyRidesScreenState extends State<MyRidesScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Container(
-                    width: 80,
-                    height: 80,
+                    width: 90,
+                    height: 90,
                     decoration: BoxDecoration(
-                      color: AppColors.backgroundGrey,
-                      shape: BoxShape.circle,
+                      color: const Color(0xFFF0EFFF),
+                      borderRadius: BorderRadius.circular(28),
                     ),
                     child: const Icon(
-                      Icons.directions_car_outlined,
-                      size: 40,
-                      color: AppColors.textLight,
+                      PhosphorIconsRegular.carProfile,
+                      size: 44,
+                      color: Color(0xFF6C63FF),
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 24),
                   const Text(
                     'No rides yet',
                     style: TextStyle(
@@ -91,10 +92,16 @@ class _MyRidesScreenState extends State<MyRidesScreen> {
                       color: AppColors.textDark,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   const Text(
-                    'Your ride history will appear here',
-                    style: TextStyle(fontSize: 14, color: AppColors.textMedium),
+                    'Your ride history will appear here\nonce you complete a trip.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textMedium,
+                      height: 1.4,
+                    ),
                   ),
                 ],
               ),
@@ -102,7 +109,8 @@ class _MyRidesScreenState extends State<MyRidesScreen> {
           : ListView.builder(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
               itemCount: state.rideHistory.length,
-              itemBuilder: (_, i) => _RideHistoryCard(ride: state.rideHistory[i]),
+              itemBuilder: (_, i) =>
+                  _RideHistoryCard(ride: state.rideHistory[i]),
             ),
     );
   }
@@ -124,30 +132,32 @@ class _RideHistoryCard extends StatelessWidget {
     final double distance = _parseDouble(ride['distance']);
     final double fare = _parseDouble(
       ride['final_fare'] ??
-      ride['finalFare'] ??
-      ride['estimated_fare'] ??
-      ride['estimatedFare']
+          ride['finalFare'] ??
+          ride['estimated_fare'] ??
+          ride['estimatedFare'],
     );
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: const [
-          BoxShadow(color: Color(0x0A000000), blurRadius: 16, offset: Offset(0, 4)),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Date, time, distance + Status badge + Fare
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Date & time/distance
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -156,12 +166,11 @@ class _RideHistoryCard extends StatelessWidget {
                         dateStr,
                         style: const TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                           color: AppColors.textDark,
-                          letterSpacing: -0.3,
                         ),
                       ),
-                      const SizedBox(height: 3),
+                      const SizedBox(height: 4),
                       Text(
                         '$timeStr • ${distance.toStringAsFixed(1)} km',
                         style: const TextStyle(
@@ -173,70 +182,69 @@ class _RideHistoryCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                // Status badge
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
+                    horizontal: 12,
+                    vertical: 6,
                   ),
                   decoration: BoxDecoration(
                     color: isCancelled
-                        ? AppColors.error.withValues(alpha: 0.08)
+                        ? const Color(0xFFFFECEC)
                         : (isCompleted
-                              ? AppColors.primaryGreen.withValues(alpha: 0.08)
-                              : Colors.orange.withValues(alpha: 0.08)),
-                    borderRadius: BorderRadius.circular(20),
+                              ? const Color(0xFFEBF7E5)
+                              : const Color(0xFFFFF5E5)),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     isCancelled
                         ? 'Cancelled'
                         : (isCompleted ? 'Completed' : 'Unknown'),
                     style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
                       color: isCancelled
-                          ? AppColors.error
+                          ? const Color(0xFFFF4D4D)
                           : (isCompleted
-                                ? AppColors.primaryGreen
-                                : Colors.orange),
+                                ? const Color(0xFF38B000)
+                                : const Color(0xFFFF9F1C)),
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
-                // Fare
+                const SizedBox(width: 14),
                 Text(
                   '₹${fare.toStringAsFixed(0)}',
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textDark,
+                    letterSpacing: -0.5,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 20),
             Row(
               children: [
                 Column(
                   children: [
                     Container(
-                      width: 10,
-                      height: 10,
+                      width: 12,
+                      height: 12,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: AppColors.white,
-                        border: Border.all(color: AppColors.primary, width: 2.5),
+                        border: Border.all(color: AppColors.primary, width: 3),
                       ),
                     ),
                     Container(
-                      width: 1.5,
+                      width: 2,
                       height: 24,
                       margin: const EdgeInsets.symmetric(vertical: 4),
-                      color: AppColors.divider,
+                      color: AppColors.divider.withValues(alpha: 0.5),
                     ),
                     Container(
-                      width: 10,
-                      height: 10,
+                      width: 12,
+                      height: 12,
                       decoration: const BoxDecoration(
                         shape: BoxShape.circle,
                         color: AppColors.error,
@@ -250,22 +258,25 @@ class _RideHistoryCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        ride['pickup_address'] ?? ride['pickupAddress'] ?? 'Unknown Pickup',
+                        ride['pickup_address'] ??
+                            ride['pickupAddress'] ??
+                            'Unknown Pickup',
                         style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
                           color: AppColors.textDark,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 18),
-                      // Divider(height: 24, color: AppColors.divider),
+                      const SizedBox(height: 16),
                       Text(
-                        ride['drop_address'] ?? ride['dropAddress'] ?? 'Unknown Drop',
+                        ride['drop_address'] ??
+                            ride['dropAddress'] ??
+                            'Unknown Drop',
                         style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
                           color: AppColors.textDark,
                         ),
                         maxLines: 1,
@@ -287,8 +298,18 @@ class _RideHistoryCard extends StatelessWidget {
     try {
       final dt = DateTime.parse(isoDate);
       final months = [
-        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
       ];
       return '${dt.day.toString().padLeft(2, '0')} ${months[dt.month - 1]}';
     } catch (_) {

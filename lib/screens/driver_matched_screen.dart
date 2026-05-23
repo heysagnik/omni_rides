@@ -11,6 +11,7 @@ import '../theme/app_colors.dart';
 import '../routes/app_router.dart';
 import '../services/ride_service.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Shows the matched driver details, live ETA, and OTP.
 ///
@@ -230,7 +231,6 @@ class _DriverMatchedScreenState extends State<DriverMatchedScreen> {
     final status = (d['status'] as String?) ?? '';
     final state = context.read<AppState>();
 
-    debugPrint('[DriverMatched._fetchRide] status=$status  raw: $d');
 
     // --- Driver info (robust parsing — same logic as searching_screen) ---
     final driver = d['driver'] as Map<String, dynamic>? ?? {};
@@ -291,7 +291,6 @@ class _DriverMatchedScreenState extends State<DriverMatchedScreen> {
     // OTP — ?.toString() handles both String "1234" and int 1234
     final otp =
         (d['otp'] ?? d['rideOtp'] ?? d['ride_otp'])?.toString() ?? '';
-    debugPrint('[DriverMatched._fetchRide] otp=$otp  name=$name  vehicle=$vehicle  plate=$plate  rating=$rating');
 
     state.driverMatched(
       name: name.isNotEmpty ? name : 'Your Driver',
@@ -616,13 +615,24 @@ class _DriverRow extends StatelessWidget {
         if (state.driverPhone.isNotEmpty) ...[
           const SizedBox(width: 10),
           GestureDetector(
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Calling ${state.driverPhone}…'),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
+            onTap: () async {
+              final url = Uri.parse('tel:${state.driverPhone}');
+              try {
+                if (await canLaunchUrl(url)) {
+                  await launchUrl(url);
+                } else {
+                  throw 'Could not launch dialer';
+                }
+              } catch (_) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Could not dial ${state.driverPhone}'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              }
             },
             child: Container(
               padding: const EdgeInsets.all(8),

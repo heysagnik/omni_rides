@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/app_state.dart';
 import '../theme/app_colors.dart';
 import '../routes/app_router.dart';
@@ -33,39 +36,26 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isSearching = false;
   List<Map<String, dynamic>> _suggestions = [];
   Timer? _debounce;
+  double? _draggedHeight;
+  bool _isDragging = false;
 
-  static const _benguluruCenter = LatLng(12.9716, 77.5946);
+  static const _defaultCenter = LatLng(0.0, 0.0);
 
-  static const _recentPlaces = [
-    PlaceItem('Koramangala', '6th Block, Bengaluru', Icons.work_outline_rounded),
-    PlaceItem('Indiranagar', '100 Feet Road, Bengaluru', Icons.home_outlined),
-    PlaceItem('MG Road', 'Brigade Road, Bengaluru', Icons.shopping_bag_outlined),
-  ];
+  List<PlaceItem> _recentPlaces = [];
 
   @override
   void initState() {
     super.initState();
-    _pickupFocus.addListener(() {
-      if (_pickupFocus.hasFocus && _activeField != 'pickup') {
-        setState(() {
-          _activeField = 'pickup';
-          _suggestions = [];
-        });
-      }
-    });
-    _destFocus.addListener(() {
-      if (_destFocus.hasFocus && _activeField != 'destination') {
-        setState(() {
-          _activeField = 'destination';
-          _suggestions = [];
-        });
-      }
-    });
+    _loadRecentSearches();
+    _pickupFocus.addListener(_onPickupFocusChange);
+    _destFocus.addListener(_onDestFocusChange);
     WidgetsBinding.instance.addPostFrameCallback((_) => _initLocation());
   }
 
   @override
   void dispose() {
+    _pickupFocus.removeListener(_onPickupFocusChange);
+    _destFocus.removeListener(_onDestFocusChange);
     _mapController?.dispose();
     _pickupCtrl.dispose();
     _destCtrl.dispose();
@@ -73,6 +63,58 @@ class _HomeScreenState extends State<HomeScreen> {
     _destFocus.dispose();
     _debounce?.cancel();
     super.dispose();
+  }
+
+  void _onPickupFocusChange() {
+    if (_pickupFocus.hasFocus && _activeField != 'pickup') {
+      setState(() { _activeField = 'pickup'; _suggestions = []; });
+    }
+  }
+
+  void _onDestFocusChange() {
+    if (_destFocus.hasFocus && _activeField != 'destination') {
+      setState(() { _activeField = 'destination'; _suggestions = []; });
+    }
+  }
+
+  Future<void> _loadRecentSearches() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList('recent_searches');
+      if (list != null && list.isNotEmpty) {
+        setState(() {
+          _recentPlaces = list.map((item) {
+            final map = jsonDecode(item) as Map<String, dynamic>;
+            final iconCode = map['iconCode'] as int? ?? Icons.location_on_outlined.codePoint;
+            return PlaceItem(
+              map['name'] as String,
+              map['subtitle'] as String,
+              IconData(iconCode, fontFamily: 'MaterialIcons'),
+              lat: map['lat'] as double?,
+              lng: map['lng'] as double?,
+            );
+          }).toList();
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveRecentSearch(String name, String subtitle, double lat, double lng) async {
+    if (name.isEmpty) return;
+    _recentPlaces.removeWhere((item) => item.name == name);
+    _recentPlaces.insert(0, PlaceItem(name, subtitle, Icons.location_on_outlined, lat: lat, lng: lng));
+    if (_recentPlaces.length > 5) _recentPlaces = _recentPlaces.sublist(0, 5);
+    setState(() {});
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('recent_searches', _recentPlaces.map((item) => jsonEncode({
+        'name': item.name,
+        'subtitle': item.subtitle,
+        'iconCode': item.icon.codePoint,
+        'lat': item.lat,
+        'lng': item.lng,
+      })).toList());
+    } catch (_) {}
   }
 
   Future<void> _initLocation() async {
@@ -84,8 +126,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     final pos = await LocationService.getCurrentPosition();
     if (!mounted || pos == null) return;
-    final addr =
-        await LocationService.getAddressFromLatLng(pos.latitude, pos.longitude);
+    final addr = await LocationService.getAddressFromLatLng(pos.latitude, pos.longitude);
     final label = addr.isNotEmpty ? addr : 'Current Location';
     state.updateCurrentLocation(pos.latitude, pos.longitude, label);
     if (mounted) {
@@ -100,6 +141,24 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _fitRouteBounds() {
+    final s = context.read<AppState>();
+    if (_mapController == null || s.currentLat == 0 || s.destinationLat == 0) return;
+    final minLat = s.currentLat < s.destinationLat ? s.currentLat : s.destinationLat;
+    final maxLat = s.currentLat > s.destinationLat ? s.currentLat : s.destinationLat;
+    final minLng = s.currentLng < s.destinationLng ? s.currentLng : s.destinationLng;
+    final maxLng = s.currentLng > s.destinationLng ? s.currentLng : s.destinationLng;
+    _mapController?.animateCamera(
+      CameraUpdate.newLatLngBounds(
+        LatLngBounds(
+          southwest: LatLng(minLat - 0.006, minLng - 0.006),
+          northeast: LatLng(maxLat + 0.006, maxLng + 0.006),
+        ),
+        80,
+      ),
+    );
+  }
+
   void _enterSearch([PlaceItem? place]) {
     final state = context.read<AppState>();
     if (_pickupCtrl.text.isEmpty && state.currentAddress.isNotEmpty) {
@@ -110,19 +169,52 @@ class _HomeScreenState extends State<HomeScreen> {
       _activeField = 'destination';
       if (place != null) {
         _destCtrl.text = place.name;
-        // Check if both fields are available to make it bookable right away
+        if (place.lat != null && place.lng != null) {
+          state.setDestination(place.name, place.lat!, place.lng!);
+          if (state.pickupLat != 0) {
+            _fitRouteBounds();
+          } else {
+            _moveCamera(LatLng(place.lat!, place.lng!));
+          }
+        }
       }
     });
     Future.delayed(const Duration(milliseconds: 200), () {
-      if (mounted) FocusScope.of(context).requestFocus(_destFocus);
+      if (!mounted) return;
+      if (place != null && place.lat != null) {
+        FocusScope.of(context).unfocus();
+      } else {
+        FocusScope.of(context).requestFocus(_destFocus);
+      }
     });
   }
 
   void _exitSearch() {
     FocusScope.of(context).unfocus();
+    setState(() { _mode = _Mode.idle; _suggestions = []; });
+  }
+
+  void _onVerticalDragUpdate(DragUpdateDetails details) {
+    final screenH = MediaQuery.of(context).size.height;
+    final defaultIdleH = screenH * 0.40;
+    final baseHeight = _mode == _Mode.searching ? screenH : defaultIdleH;
+    final newHeight = ((_draggedHeight ?? baseHeight) - (details.primaryDelta ?? 0.0))
+        .clamp(defaultIdleH - 30.0, screenH);
+    setState(() { _isDragging = true; _draggedHeight = newHeight; });
+  }
+
+  void _onVerticalDragEnd(DragEndDetails details) {
+    final screenH = MediaQuery.of(context).size.height;
+    final defaultIdleH = screenH * 0.40;
+    final currentHeight = _draggedHeight ?? (_mode == _Mode.searching ? screenH : defaultIdleH);
     setState(() {
-      _mode = _Mode.idle;
-      _suggestions = [];
+      _isDragging = false;
+      _draggedHeight = null;
+      if (currentHeight > (defaultIdleH + screenH) / 2) {
+        _enterSearch();
+      } else {
+        _exitSearch();
+      }
     });
   }
 
@@ -141,18 +233,14 @@ class _HomeScreenState extends State<HomeScreen> {
         lat: s.currentLat != 0 ? s.currentLat : null,
         lng: s.currentLng != 0 ? s.currentLng : null,
       );
-      if (mounted) {
-        setState(() {
-          _suggestions = results ?? [];
-          _isSearching = false;
-        });
-      }
+      if (mounted) setState(() { _suggestions = results ?? []; _isSearching = false; });
     });
   }
 
   void _pick(Map<String, dynamic> loc) {
     final state = context.read<AppState>();
     final name = loc['name'] as String? ?? '';
+    final address = loc['address'] as String? ?? '';
     final lat = (loc['lat'] as num).toDouble();
     final lng = (loc['lng'] as num).toDouble();
 
@@ -166,7 +254,12 @@ class _HomeScreenState extends State<HomeScreen> {
       state.setDestination(name, lat, lng);
       setState(() => _suggestions = []);
       FocusScope.of(context).unfocus();
-      _moveCamera(LatLng(lat, lng));
+      _saveRecentSearch(name, address, lat, lng);
+      if (state.pickupLat != 0) {
+        _fitRouteBounds();
+      } else {
+        _moveCamera(LatLng(lat, lng));
+      }
     }
   }
 
@@ -177,9 +270,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   LatLng get _cameraTarget {
     final s = context.read<AppState>();
-    return s.currentLat != 0
-        ? LatLng(s.currentLat, s.currentLng)
-        : _benguluruCenter;
+    return s.currentLat != 0 ? LatLng(s.currentLat, s.currentLng) : _defaultCenter;
   }
 
   @override
@@ -187,24 +278,55 @@ class _HomeScreenState extends State<HomeScreen> {
     final state = context.watch<AppState>();
     final safeTop = MediaQuery.of(context).padding.top;
     final screenH = MediaQuery.of(context).size.height;
-    final cardH = screenH * 0.52;
+    final isSearchingMode = _mode == _Mode.searching;
+    final defaultIdleH = screenH * 0.40;
+    final cardH = _draggedHeight ?? (isSearchingMode ? screenH : defaultIdleH);
+    final animDuration = _isDragging ? Duration.zero : const Duration(milliseconds: 300);
 
-    return Scaffold(
-      resizeToAvoidBottomInset: false,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          // ── Full-screen Google Map ─────────────────────────────────────
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+
+        if (_mode == _Mode.searching) {
+          _exitSearch();
+          return;
+        }
+
+        final shouldExit = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Exit App'),
+            content: const Text('Are you sure you want to exit the app?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Exit', style: TextStyle(color: Colors.red)),
+              ),
+            ],
+          ),
+        );
+
+        if (shouldExit == true) {
+          SystemNavigator.pop();
+        }
+      },
+      child: Scaffold(
+        resizeToAvoidBottomInset: false,
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
           GoogleMap(
             onMapCreated: (c) {
               _mapController = c;
               final s = context.read<AppState>();
-              if (s.currentLat != 0) {
-                _moveCamera(LatLng(s.currentLat, s.currentLng));
-              }
+              if (s.currentLat != 0) _moveCamera(LatLng(s.currentLat, s.currentLng));
             },
-            initialCameraPosition:
-                CameraPosition(target: _cameraTarget, zoom: 15),
+            initialCameraPosition: CameraPosition(target: _cameraTarget, zoom: 15),
             style: _mapStyle,
             myLocationEnabled: true,
             myLocationButtonEnabled: false,
@@ -212,58 +334,55 @@ class _HomeScreenState extends State<HomeScreen> {
             mapToolbarEnabled: false,
             compassEnabled: false,
             padding: EdgeInsets.only(bottom: cardH - 24),
-            markers: state.currentLat != 0
-                ? {
-                    Marker(
-                      markerId: const MarkerId('pickup'),
-                      position: LatLng(state.currentLat, state.currentLng),
-                      icon: BitmapDescriptor.defaultMarkerWithHue(
-                          BitmapDescriptor.hueGreen),
-                    ),
-                  }
-                : {},
+            markers: {
+              if (state.pickupLat != 0)
+                Marker(
+                  markerId: const MarkerId('pickup'),
+                  position: LatLng(state.pickupLat, state.pickupLng),
+                  icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+                  infoWindow: const InfoWindow(title: 'Pickup'),
+                ),
+              if (state.destinationLat != 0)
+                Marker(
+                  markerId: const MarkerId('destination'),
+                  position: LatLng(state.destinationLat, state.destinationLng),
+                  icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+                  infoWindow: const InfoWindow(title: 'Destination'),
+                ),
+            },
           ),
 
-          // ── Top gradient — depth over map ────────────────────────────────
           Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 100,
+            top: 0, left: 0, right: 0, height: 100,
             child: IgnorePointer(
               child: Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withValues(alpha: 0.2),
-                      Colors.transparent,
-                    ],
+                    colors: [Colors.black.withValues(alpha: 0.2), Colors.transparent],
                   ),
                 ),
               ),
             ),
           ),
 
-          // ── Locate Me FAB — sits just above the card ─────────────────────
-          Positioned(
+          AnimatedPositioned(
+            duration: animDuration,
+            curve: Curves.easeOutCubic,
             bottom: cardH + 12,
             right: 16,
             child: LocateFab(onTap: _initLocation),
           ),
 
-          // ── Bottom card ───────────────────────────────────────────────────
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
+          AnimatedPositioned(
+            duration: animDuration,
+            curve: Curves.easeOutCubic,
+            bottom: 0, left: 0, right: 0,
             height: cardH,
             child: _BottomCard(
               mode: _mode,
-              firstName: state.userName.isNotEmpty
-                  ? state.userName.split(' ').first
-                  : null,
+              firstName: state.userName.isNotEmpty ? state.userName.split(' ').first : null,
               currentAddress: state.currentAddress,
               pickupCtrl: _pickupCtrl,
               destCtrl: _destCtrl,
@@ -277,86 +396,89 @@ class _HomeScreenState extends State<HomeScreen> {
               onBack: _exitSearch,
               onType: _onType,
               onPickSuggestion: _pick,
-              onBook: () =>
-                  Navigator.pushNamed(context, AppRouter.searching),
+              onPickRecent: _enterSearch,
+              onBook: () => Navigator.pushNamed(context, AppRouter.searching),
+              onDragUpdate: _onVerticalDragUpdate,
+              onDragEnd: _onVerticalDragEnd,
             ),
           ),
 
-          // ── Floating top bar — location + account avatar ─────────────────
-          Positioned(
-            top: safeTop + 12,
-            left: 16,
-            right: 16,
+          AnimatedPositioned(
+            duration: animDuration,
+            curve: Curves.easeOutCubic,
+            top: isSearchingMode ? -80 : safeTop + 12,
+            left: 16, right: 16,
             child: Row(
               children: [
-                // Location pill
                 Expanded(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: const [
+                      color: Colors.white.withValues(alpha: 0.95),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.8), width: 1.5),
+                      boxShadow: [
                         BoxShadow(
-                            color: Color(0x1A000000),
-                            blurRadius: 12,
-                            offset: Offset(0, 3)),
+                          color: const Color(0xFF111111).withValues(alpha: 0.08),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
                       ],
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.location_on_rounded,
-                            size: 16, color: AppColors.primary),
-                        const SizedBox(width: 6),
+                        const LocationPulseDot(),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: Consumer<AppState>(
                             builder: (_, s, __) => Text(
-                              s.currentAddress.isNotEmpty
-                                  ? _shortAddress(s.currentAddress)
-                                  : 'Getting location…',
+                              s.currentAddress.isNotEmpty ? _shortAddress(s.currentAddress) : 'Getting location…',
                               style: const TextStyle(
                                 fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF1A1A1A),
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textDark,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ),
-                        const Icon(Icons.keyboard_arrow_down_rounded,
-                            size: 18, color: Color(0xFF888888)),
+                        const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: AppColors.textMedium),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
-                // Account avatar button
+                const SizedBox(width: 12),
                 GestureDetector(
-                  onTap: () =>
-                      Navigator.pushNamed(context, AppRouter.profile),
+                  onTap: () => Navigator.pushNamed(context, AppRouter.profile),
                   child: Container(
-                    width: 44,
-                    height: 44,
+                    width: 44, height: 44,
+                    padding: const EdgeInsets.all(2),
                     decoration: BoxDecoration(
-                      color: Colors.white,
                       shape: BoxShape.circle,
-                      boxShadow: const [
+                      gradient: const LinearGradient(
+                        colors: [AppColors.primary, AppColors.primaryLight, AppColors.accent],
+                      ),
+                      boxShadow: [
                         BoxShadow(
-                            color: Color(0x1A000000),
-                            blurRadius: 12,
-                            offset: Offset(0, 3)),
+                          color: AppColors.primary.withValues(alpha: 0.2),
+                          blurRadius: 10, offset: const Offset(0, 3),
+                        ),
                       ],
                     ),
-                    child: Consumer<AppState>(
-                      builder: (_, s, __) => ClipOval(
-                        child: s.userPhotoUrl.isNotEmpty
-                            ? Image.network(s.userPhotoUrl,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) =>
-                                    _AvatarFallback(name: s.userName))
-                            : _AvatarFallback(name: s.userName),
+                    child: Container(
+                      decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                      padding: const EdgeInsets.all(2),
+                      child: ClipOval(
+                        child: Consumer<AppState>(
+                          builder: (_, s, __) => s.userPhotoUrl.isNotEmpty
+                              ? Image.network(
+                                  s.userPhotoUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => _AvatarFallback(name: s.userName),
+                                )
+                              : _AvatarFallback(name: s.userName),
+                        ),
                       ),
                     ),
                   ),
@@ -366,11 +488,10 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+      )
     );
   }
 }
-
-// ─── Avatar fallback ─────────────────────────────────────────────────────────
 
 class _AvatarFallback extends StatelessWidget {
   final String name;
@@ -378,17 +499,12 @@ class _AvatarFallback extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
     return Container(
       color: AppColors.primary,
       alignment: Alignment.center,
       child: Text(
-        initial,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 18,
-          fontWeight: FontWeight.w700,
-        ),
+        name.isNotEmpty ? name[0].toUpperCase() : '?',
+        style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
       ),
     );
   }
@@ -398,8 +514,6 @@ String _shortAddress(String address) {
   final parts = address.split(',').map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
   return parts.take(2).join(', ');
 }
-
-// ─── Bottom card ─────────────────────────────────────────────────────────────
 
 class _BottomCard extends StatelessWidget {
   final _Mode mode;
@@ -417,7 +531,10 @@ class _BottomCard extends StatelessWidget {
   final VoidCallback onBack;
   final ValueChanged<String> onType;
   final ValueChanged<Map<String, dynamic>> onPickSuggestion;
+  final void Function(PlaceItem) onPickRecent;
   final VoidCallback onBook;
+  final ValueChanged<DragUpdateDetails>? onDragUpdate;
+  final ValueChanged<DragEndDetails>? onDragEnd;
 
   const _BottomCard({
     required this.mode,
@@ -435,36 +552,50 @@ class _BottomCard extends StatelessWidget {
     required this.onBack,
     required this.onType,
     required this.onPickSuggestion,
+    required this.onPickRecent,
     required this.onBook,
+    this.onDragUpdate,
+    this.onDragEnd,
   });
 
   @override
   Widget build(BuildContext context) {
+    final safeTop = MediaQuery.of(context).padding.top;
+    final isSearchingMode = mode == _Mode.searching;
+
     return Container(
       decoration: const BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        boxShadow: [
-          BoxShadow(color: Color(0x20000000), blurRadius: 28, offset: Offset(0, -6)),
-        ],
+        boxShadow: [BoxShadow(color: Color(0x20000000), blurRadius: 28, offset: Offset(0, -6))],
       ),
       child: Column(
         children: [
-          // Pill handle
-          Container(
-            width: 40,
-            height: 4,
-            margin: const EdgeInsets.only(top: 12, bottom: 4),
-            decoration: BoxDecoration(
-              color: AppColors.border,
-              borderRadius: BorderRadius.circular(2),
+          GestureDetector(
+            onVerticalDragUpdate: onDragUpdate,
+            onVerticalDragEnd: onDragEnd,
+            behavior: HitTestBehavior.translucent,
+            child: Container(
+              width: double.infinity,
+              color: Colors.transparent,
+              child: Center(
+                child: isSearchingMode
+                    ? SizedBox(height: safeTop + 8)
+                    : Container(
+                        width: 40, height: 4,
+                        margin: const EdgeInsets.only(top: 12, bottom: 8),
+                        decoration: BoxDecoration(
+                          color: AppColors.border,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+              ),
             ),
           ),
           Expanded(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 220),
-              transitionBuilder: (child, anim) =>
-                  FadeTransition(opacity: anim, child: child),
+              transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: child),
               child: mode == _Mode.idle
                   ? IdleBody(
                       key: const ValueKey('idle'),
@@ -472,6 +603,8 @@ class _BottomCard extends StatelessWidget {
                       currentAddress: currentAddress,
                       recentPlaces: recentPlaces,
                       onSearchTap: onSearchTap,
+                      onDragUpdate: onDragUpdate,
+                      onDragEnd: onDragEnd,
                     )
                   : SearchBody(
                       key: const ValueKey('search'),
@@ -480,14 +613,62 @@ class _BottomCard extends StatelessWidget {
                       pickupFocus: pickupFocus,
                       destFocus: destFocus,
                       suggestions: suggestions,
+                      recentPlaces: recentPlaces,
                       isSearching: isSearching,
                       canBook: canBook,
                       onType: onType,
                       onPickSuggestion: onPickSuggestion,
+                      onPickRecent: onPickRecent,
                       onBack: onBack,
                       onBook: onBook,
                     ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class LocationPulseDot extends StatefulWidget {
+  const LocationPulseDot({super.key});
+
+  @override
+  State<LocationPulseDot> createState() => _LocationPulseDotState();
+}
+
+class _LocationPulseDotState extends State<LocationPulseDot> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 1))..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) => Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 14, height: 14,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.primary.withValues(alpha: 0.15 + _controller.value * 0.25),
+            ),
+          ),
+          Container(
+            width: 8, height: 8,
+            decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.primary),
           ),
         ],
       ),
