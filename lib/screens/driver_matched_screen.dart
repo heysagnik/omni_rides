@@ -30,6 +30,7 @@ class DriverMatchedScreen extends StatefulWidget {
 class _DriverMatchedScreenState extends State<DriverMatchedScreen> {
   final RideService _rideService = RideService();
   Timer? _pollTimer;
+  Timer? _trackTimer;       // live-location polling (every 4 s)
   GoogleMapController? _mapController;
 
   // 'en_route' | 'arrived'
@@ -50,6 +51,7 @@ class _DriverMatchedScreenState extends State<DriverMatchedScreen> {
   @override
   void dispose() {
     _pollTimer?.cancel();
+    _trackTimer?.cancel();
     _mapController?.dispose();
     super.dispose();
   }
@@ -214,27 +216,38 @@ class _DriverMatchedScreenState extends State<DriverMatchedScreen> {
   // ── Data fetching ────────────────────────────────────────────────────────
 
   Future<void> _fetchAndPoll() async {
-    await _fetchTrack();
+    await _updateDriverLiveLocation(); // immediate first fetch
     await _fetchRide();
     if (!mounted) return;
+    // Live-location every 4 s — redraws route + updates ETA
+    _trackTimer = Timer.periodic(const Duration(seconds: 4), (_) => _updateDriverLiveLocation());
+    // Ride status every 5 s — detects phase transitions
     _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) => _fetchRide());
   }
 
-  Future<void> _fetchTrack() async {
+  /// Polls /ride/:id/track for the latest driver GPS position,
+  /// updates AppState, then redraws the map route and recalculates ETA.
+  Future<void> _updateDriverLiveLocation() async {
     final rideId = context.read<AppState>().rideId;
-    if (rideId.isEmpty) return;
+    if (rideId.isEmpty || !mounted) return;
+
     final track = await _rideService.getTrack(rideId);
     if (!mounted || track == null) return;
+
+    // Parse driver location — support both flat and nested formats
     final loc = track['driverLocation'] as Map<String, dynamic>?;
-    if (loc != null) {
-      final lat = (loc['lat'] as num?)?.toDouble() ?? 0;
-      final lng = (loc['lng'] as num?)?.toDouble() ?? 0;
-      if (lat != 0 && lng != 0) {
-        context.read<AppState>().updateDriverLocation(
-              lat, lng, context.read<AppState>().etaMinutes);
-        _buildMapOverlay(); // refresh map with updated driver location
-      }
-    }
+    final double lat = (loc?['lat'] as num?)?.toDouble() ??
+        (track['lat'] as num?)?.toDouble() ?? 0;
+    final double lng = (loc?['lng'] as num?)?.toDouble() ??
+        (track['lng'] as num?)?.toDouble() ?? 0;
+
+    if (lat == 0 && lng == 0) return;
+
+    // Keep existing ETA until _fetchRoute refreshes it from Directions API
+    context.read<AppState>().updateDriverLocation(
+          lat, lng, context.read<AppState>().etaMinutes);
+
+    await _buildMapOverlay(); // redraws route + animates camera
   }
 
   Future<void> _fetchRide() async {
@@ -585,10 +598,24 @@ class _DriverRow extends StatelessWidget {
 
     return Row(
       children: [
-        CircleAvatar(
-          radius: 26,
-          backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-          child: const Icon(PhosphorIconsRegular.user, color: AppColors.primary, size: 28),
+        // Driver photo — network image with initials fallback
+        Container(
+          width: 52,
+          height: 52,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: AppColors.primary.withValues(alpha: 0.12),
+          ),
+          child: ClipOval(
+            child: state.driverPhotoUrl.isNotEmpty
+                ? Image.network(
+                    state.driverPhotoUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        _DriverInitialsAvatar(name: name),
+                  )
+                : _DriverInitialsAvatar(name: name),
+          ),
         ),
         const SizedBox(width: 14),
         Expanded(
@@ -667,6 +694,35 @@ class _DriverRow extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+/// Renders initials of driver name as a coloured circle.
+class _DriverInitialsAvatar extends StatelessWidget {
+  final String name;
+  const _DriverInitialsAvatar({required this.name});
+
+  @override
+  Widget build(BuildContext context) {
+    final initials = name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((w) => w.isNotEmpty)
+        .take(2)
+        .map((w) => w[0].toUpperCase())
+        .join();
+    return Container(
+      color: AppColors.primary.withValues(alpha: 0.15),
+      alignment: Alignment.center,
+      child: Text(
+        initials.isNotEmpty ? initials : '?',
+        style: const TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+          color: AppColors.primary,
+        ),
+      ),
     );
   }
 }
