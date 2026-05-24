@@ -125,6 +125,19 @@ class RideService {
     }
   }
 
+  Future<Map<String, dynamic>?> getDriverDetails(String driverId) async {
+    try {
+      final response = await _apiService.get('/ride/driver/$driverId');
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error getting driver details: $e');
+      return null;
+    }
+  }
+
   // Get Payment Details
   Future<Map<String, dynamic>?> getPaymentDetails(String rideId) async {
     try {
@@ -135,6 +148,23 @@ class RideService {
       return null;
     } catch (e) {
       debugPrint('Error getting payment details: $e');
+      return null;
+    }
+  }
+
+  // Initialize Payment row explicitly if missing or starting non-cash payment
+  Future<Map<String, dynamic>?> initializePayment(String rideId, String method) async {
+    try {
+      final response = await _apiService.post('/payment/initialize', body: {
+        'rideId': rideId,
+        'method': method,
+      });
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return jsonDecode(response.body);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error initializing payment: $e');
       return null;
     }
   }
@@ -170,7 +200,7 @@ class RideService {
     try {
       final response = await _apiService.post('/ride/$rideId/rate', body: {
         'rating': rating,
-        if (comment != null && comment.isNotEmpty) 'comment': comment,
+        'comment': comment ?? '',
       });
       return response.statusCode == 200;
     } catch (e) {
@@ -213,11 +243,15 @@ class RideService {
       if (response.statusCode != 200) return null;
       final data = jsonDecode(response.body);
       final List rides = data is List ? data : (data['rides'] ?? []);
+      debugPrint('Diagnostic: Fetched ${rides.length} rides from history.');
       for (final ride in rides) {
+        debugPrint('Checking ride ID=${ride['id']} with status=${ride['status']}');
         if (_activeStatuses.contains(ride['status'])) {
+          debugPrint('Active ride match found! ID=${ride['id']}, status=${ride['status']}');
           return ride as Map<String, dynamic>;
         }
       }
+      debugPrint('Diagnostic: No active ride match found in history.');
       return null;
     } catch (e) {
       debugPrint('Error getting active ride: $e');

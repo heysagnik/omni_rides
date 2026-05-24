@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
 import '../theme/app_colors.dart';
+import '../theme/map_style.dart';
 import '../routes/app_router.dart';
 import '../services/ride_service.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -121,15 +122,15 @@ class _DriverMatchedScreenState extends State<DriverMatchedScreen> {
       _mapController!.animateCamera(
         CameraUpdate.newLatLngBounds(
           LatLngBounds(
-            southwest: LatLng(minLat - 0.005, minLng - 0.005),
-            northeast: LatLng(maxLat + 0.005, maxLng + 0.005),
+            southwest: LatLng(minLat - 0.003, minLng - 0.003),
+            northeast: LatLng(maxLat + 0.003, maxLng + 0.003),
           ),
           80,
         ),
       );
     } else {
       _mapController!.animateCamera(
-        CameraUpdate.newLatLngZoom(LatLng(pLat, pLng), 15),
+        CameraUpdate.newLatLngZoom(LatLng(pLat, pLng), 16),
       );
     }
   }
@@ -153,6 +154,22 @@ class _DriverMatchedScreenState extends State<DriverMatchedScreen> {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       final routes = data['routes'] as List?;
       if (routes == null || routes.isEmpty) return [];
+
+      final legs = routes[0]['legs'] as List?;
+      if (legs != null && legs.isNotEmpty) {
+        final leg = legs[0] as Map<String, dynamic>;
+        final durationVal = leg['duration']?['value'] as num?;
+        if (durationVal != null) {
+          final realTimeEta = (durationVal / 60).round();
+          if (mounted) {
+            context.read<AppState>().updateDriverLocation(
+                  origin.latitude,
+                  origin.longitude,
+                  realTimeEta > 0 ? realTimeEta : 1,
+                );
+          }
+        }
+      }
 
       final polylineStr =
           routes[0]['overview_polyline']?['points'] as String?;
@@ -288,9 +305,7 @@ class _DriverMatchedScreenState extends State<DriverMatchedScreen> {
         ((d['eta'] ?? d['etaMinutes'] ?? d['eta_minutes']) as num?)?.toInt() ??
             state.etaMinutes;
 
-    // OTP — ?.toString() handles both String "1234" and int 1234
-    final otp =
-        (d['otp'] ?? d['rideOtp'] ?? d['ride_otp'])?.toString() ?? '';
+    final otp = d['otpCode']?.toString() ?? '';
 
     state.driverMatched(
       name: name.isNotEmpty ? name : 'Your Driver',
@@ -310,8 +325,13 @@ class _DriverMatchedScreenState extends State<DriverMatchedScreen> {
       _buildMapOverlay();
     }
 
+    final isRideStarted = status == 'ride_started' ||
+        status == 'in_progress' ||
+        d['startedAt'] != null ||
+        d['otpVerified'] == true;
+
     // Phase transitions
-    if (status == 'ride_started' || status == 'in_progress') {
+    if (isRideStarted) {
       _pollTimer?.cancel();
       state.startRide();
       if (mounted) Navigator.pushReplacementNamed(context, AppRouter.inTransit);
@@ -367,8 +387,9 @@ class _DriverMatchedScreenState extends State<DriverMatchedScreen> {
             GoogleMap(
             initialCameraPosition: CameraPosition(
               target: initialTarget,
-              zoom: 14,
+              zoom: 16,
             ),
+            style: MapStyles.premiumStyle,
             markers: _markers,
             polylines: _polylines,
             myLocationEnabled: false,

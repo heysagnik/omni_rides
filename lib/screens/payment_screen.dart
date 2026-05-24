@@ -38,19 +38,37 @@ class _PaymentScreenState extends State<PaymentScreen>
     super.dispose();
   }
 
-  Future<void> _fetchPaymentDetails() async {
+  Future<void> _fetchPaymentDetails({int retries = 3}) async {
     final state = context.read<AppState>();
     final rideId = state.rideId;
     if (rideId.isEmpty) return;
 
-    final payment = await _rideService.getPaymentDetails(rideId);
+    Map<String, dynamic>? payment;
+    for (int i = 0; i < retries; i++) {
+      payment = await _rideService.getPaymentDetails(rideId);
+      if (payment != null) break;
+      if (i < retries - 1) {
+        await Future.delayed(const Duration(seconds: 1));
+      }
+    }
+
+    // Fallback: If still not found, explicitly initialize the payment row on backend
+    payment ??= await _rideService.initializePayment(rideId, _selectedMethod);
+
     if (!mounted || payment == null) return;
 
-    final paymentId = payment['id'] as String? ?? '';
+    final paymentId = payment['id'] as String? ?? payment['paymentId'] as String? ?? '';
     if (paymentId.isNotEmpty) state.setPaymentId(paymentId);
 
     // Use the authoritative amount from the payment record
-    final amount = (payment['amount'] as num?)?.toDouble() ?? 0;
+    final rawAmount = payment['amount'];
+    double amount = 0;
+    if (rawAmount is num) {
+      amount = rawAmount.toDouble();
+    } else if (rawAmount is String) {
+      amount = double.tryParse(rawAmount) ?? 0.0;
+    }
+    
     if (amount > 0 && mounted) {
       setState(() => _finalFare = amount);
     }
@@ -62,7 +80,19 @@ class _PaymentScreenState extends State<PaymentScreen>
     final state = context.read<AppState>();
     state.setPaymentMethod(_selectedMethod);
 
-    final paymentId = state.paymentId;
+    String paymentId = state.paymentId;
+    
+    // Safety fallback: if paymentId is empty, try initializing it now
+    if (paymentId.isEmpty) {
+      final payment = await _rideService.initializePayment(state.rideId, _selectedMethod);
+      if (payment != null) {
+        paymentId = payment['id'] as String? ?? payment['paymentId'] as String? ?? '';
+        if (paymentId.isNotEmpty) {
+          state.setPaymentId(paymentId);
+        }
+      }
+    }
+
     if (paymentId.isNotEmpty) {
       await _rideService.confirmPayment(paymentId);
     }
@@ -289,138 +319,6 @@ class _PaymentScreenState extends State<PaymentScreen>
                               ),
                             ),
                           ),
-                          const SizedBox(height: 12),
-                          GestureDetector(
-                            onTap: () => setState(() => _selectedMethod = 'upi'),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: _selectedMethod == 'upi'
-                                    ? AppColors.primaryGreen.withValues(alpha: 0.05)
-                                    : AppColors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: _selectedMethod == 'upi'
-                                      ? AppColors.primaryGreen
-                                      : AppColors.border,
-                                  width: _selectedMethod == 'upi' ? 2 : 1,
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.info.withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: const Icon(Icons.qr_code_2_rounded,
-                                        color: AppColors.info, size: 24),
-                                  ),
-                                  const SizedBox(width: 14),
-                                  const Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'UPI Pay (GPay / PhonePe)',
-                                          style: TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w600,
-                                            color: AppColors.textDark,
-                                          ),
-                                        ),
-                                        SizedBox(height: 3),
-                                        Text(
-                                          'Sandbox Testing • Fast digital payment',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: AppColors.textMedium,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Icon(
-                                    _selectedMethod == 'upi'
-                                        ? Icons.check_circle
-                                        : Icons.circle_outlined,
-                                    color: _selectedMethod == 'upi'
-                                        ? AppColors.primaryGreen
-                                        : AppColors.textLight,
-                                    size: 22,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          GestureDetector(
-                            onTap: () => setState(() => _selectedMethod = 'card'),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: _selectedMethod == 'card'
-                                    ? AppColors.primaryGreen.withValues(alpha: 0.05)
-                                    : AppColors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: _selectedMethod == 'card'
-                                      ? AppColors.primaryGreen
-                                      : AppColors.border,
-                                  width: _selectedMethod == 'card' ? 2 : 1,
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                      color: Colors.purple.withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: const Icon(Icons.credit_card_rounded,
-                                        color: Colors.purple, size: 24),
-                                  ),
-                                  const SizedBox(width: 14),
-                                  const Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Credit or Debit Card',
-                                          style: TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w600,
-                                            color: AppColors.textDark,
-                                          ),
-                                        ),
-                                        SizedBox(height: 3),
-                                        Text(
-                                          'Sandbox Testing • Visa, Mastercard, RuPay',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: AppColors.textMedium,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Icon(
-                                    _selectedMethod == 'card'
-                                        ? Icons.check_circle
-                                        : Icons.circle_outlined,
-                                    color: _selectedMethod == 'card'
-                                        ? AppColors.primaryGreen
-                                        : AppColors.textLight,
-                                    size: 22,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
                         ],
                       ),
 
@@ -484,9 +382,7 @@ class _PaymentScreenState extends State<PaymentScreen>
                               ),
                             ),
                             child: Text(
-                              _selectedMethod == 'cash'
-                                  ? 'I\'ve paid ₹${displayFare.toStringAsFixed(0)} cash'
-                                  : 'Pay ₹${displayFare.toStringAsFixed(0)} via ${_selectedMethod.toUpperCase()}',
+                              "I've paid ₹${displayFare.toStringAsFixed(0)} cash",
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,

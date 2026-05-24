@@ -18,6 +18,7 @@ class _RatingScreenState extends State<RatingScreen>
     with TickerProviderStateMixin {
   int _rating = 0;
   bool _submitted = false;
+  final TextEditingController _commentController = TextEditingController();
 
   late AnimationController _checkCtrl;
   late Animation<double> _checkScale;
@@ -51,22 +52,22 @@ class _RatingScreenState extends State<RatingScreen>
   void dispose() {
     _checkCtrl.dispose();
     _fadeCtrl.dispose();
+    _commentController.dispose();
     super.dispose();
   }
 
   void _submit() async {
     if (_rating == 0) return;
     
-    // Show a loading state if we want, or just wait locally
     setState(() => _submitted = true);
     
     final state = context.read<AppState>();
     final rideService = RideService();
     
-    // Use the live rideId from state — this is the real backend UUID
     final rideId = state.rideId;
     if (rideId.isNotEmpty) {
-      rideService.rateRide(rideId, _rating, null);
+      final fullComment = _commentController.text.trim();
+      await rideService.rateRide(rideId, _rating, fullComment);
     }
     
     // Also save locally
@@ -87,167 +88,355 @@ class _RatingScreenState extends State<RatingScreen>
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
+    final isPositive = _rating >= 4;
+
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: AppColors.background,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: GestureDetector(
+          onTap: () => FocusScope.of(context).unfocus(),
           child: CustomScrollView(
+            physics: const BouncingScrollPhysics(),
             slivers: [
               SliverFillRemaining(
                 hasScrollBody: false,
-                child: Column(
-                  children: [
-                    if (!_submitted)
-                      Align(
-                        alignment: Alignment.topRight,
-                        child: Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: TextButton(
-                            onPressed: _skip,
-                            child: const Text(
-                              'Skip',
-                              style: TextStyle(
-                                color: AppColors.textMedium,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Column(
+                    children: [
+                      // Top App Bar / Skip Row
+                      if (!_submitted)
+                        Align(
+                          alignment: Alignment.topRight,
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: TextButton(
+                              onPressed: _skip,
+                              style: TextButton.styleFrom(
+                                foregroundColor: AppColors.textMedium,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                               ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    const Spacer(flex: 2),
-                    // Success Checkmark
-                    ScaleTransition(
-                      scale: _checkScale,
-                      child: Container(
-                        width: 120,
-                        height: 120,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              AppColors.primaryGreen,
-                              AppColors.primaryGreenLight,
-                            ],
-                          ),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primaryGreen.withValues(
-                                alpha: 0.3,
-                              ),
-                              blurRadius: 30,
-                              offset: const Offset(0, 10),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.check_rounded,
-                          size: 64,
-                          color: AppColors.white,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    FadeTransition(
-                      opacity: _fadeCtrl,
-                      child: Column(
-                        children: [
-                          Text(
-                            _submitted ? 'Thanks!' : 'Ride complete',
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textDark,
-                              letterSpacing: -0.3,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _submitted
-                                ? 'Redirecting to home...'
-                                : 'How was your ride with ${state.driverName.isNotEmpty ? state.driverName : "your driver"}?',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: AppColors.textMedium,
-                              height: 1.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 40),
-                    if (!_submitted) ...[
-                      // Star Rating
-                      FadeTransition(
-                        opacity: _fadeCtrl,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 24,
-                            horizontal: 16,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.backgroundGrey,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Column(
-                            children: [
-                              const Text(
-                                'Rate your driver',
+                              child: const Text(
+                                'Skip',
                                 style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.textDark,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
                                 ),
                               ),
-                              const SizedBox(height: 16),
-                              StarRating(
-                                rating: _rating,
-                                size: 40,
-                                onRatingChanged: (r) =>
-                                    setState(() => _rating = r),
+                            ),
+                          ),
+                        )
+                      else
+                        const SizedBox(height: 48),
+
+                      const Spacer(flex: 1),
+
+                      // Animated Checkmark or Driver Profile Card
+                      if (_submitted) ...[
+                        ScaleTransition(
+                          scale: _checkScale,
+                          child: Container(
+                            width: 110,
+                            height: 110,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  AppColors.primaryGreen,
+                                  AppColors.primaryGreenLight,
+                                ],
                               ),
-                              if (_rating > 0) ...[
-                                const SizedBox(height: 12),
-                                Text(
-                                  _getRatingText(_rating),
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                    color: AppColors.primaryGreen,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.primaryGreen.withValues(alpha: 0.3),
+                                  blurRadius: 24,
+                                  offset: const Offset(0, 8),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.check_rounded,
+                              size: 56,
+                              color: AppColors.white,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+                      ] else ...[
+                        // Driver Info Card Redesign
+                        FadeTransition(
+                          opacity: _fadeCtrl,
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: AppColors.white,
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(
+                                color: AppColors.border.withValues(alpha: 0.8),
+                                width: 1.5,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.textDark.withValues(alpha: 0.04),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              children: [
+                                Row(
+                                  children: [
+                                    // Avatar Frame
+                                    Container(
+                                      width: 64,
+                                      height: 64,
+                                      padding: const EdgeInsets.all(2),
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        gradient: const LinearGradient(
+                                          colors: [AppColors.primary, AppColors.accent],
+                                        ),
+                                      ),
+                                      child: Container(
+                                        decoration: const BoxDecoration(
+                                          color: Colors.white,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        padding: const EdgeInsets.all(2),
+                                        child: ClipOval(
+                                          child: state.driverPhotoUrl.isNotEmpty
+                                              ? Image.network(
+                                                  state.driverPhotoUrl,
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder: (_, __, ___) => _DriverAvatarFallback(name: state.driverName),
+                                                )
+                                              : _DriverAvatarFallback(name: state.driverName),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    // Driver Text Details
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            state.driverName.isNotEmpty ? state.driverName : 'Your Driver',
+                                            style: const TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.w700,
+                                              color: AppColors.textDark,
+                                              letterSpacing: -0.3,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            '${state.driverVehicle} • ${state.driverPlate}',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: AppColors.textMedium,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    // Driver Rating Pill
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.accent.withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.star_rounded, size: 14, color: AppColors.accent),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            state.driverRating > 0 ? state.driverRating.toStringAsFixed(1) : '4.8',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w700,
+                                              color: AppColors.accentDark,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
+
+                      // Rating Header Label
+                      FadeTransition(
+                        opacity: _fadeCtrl,
+                        child: Text(
+                          _submitted ? 'Thank You!' : 'Ride Complete',
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textDark,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      FadeTransition(
+                        opacity: _fadeCtrl,
+                        child: Text(
+                          _submitted
+                              ? 'Your feedback helps improve the community.'
+                              : 'How was your trip today?',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: AppColors.textMedium,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+
+                      const Spacer(flex: 1),
+
+                      if (!_submitted) ...[
+                        // Star Rating Input
+                        FadeTransition(
+                          opacity: _fadeCtrl,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            child: Column(
+                              children: [
+                                StarRating(
+                                  rating: _rating,
+                                  size: 46,
+                                  onRatingChanged: (r) {
+                                    setState(() {
+                                      _rating = r;
+                                    });
+                                  },
+                                ),
+                                if (_rating > 0) ...[
+                                  const SizedBox(height: 12),
+                                  AnimatedSwitcher(
+                                    duration: const Duration(milliseconds: 300),
+                                    child: Text(
+                                      _getRatingText(_rating),
+                                      key: ValueKey(_rating),
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                        color: isPositive ? AppColors.primaryDark : AppColors.accentDark,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        // Custom Comments Field (Visible only when rating > 0)
+                        if (_rating > 0) ...[
+                          const SizedBox(height: 16),
+                          FadeTransition(
+                            opacity: _fadeCtrl,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Additional feedback (optional)',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.textDark,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: AppColors.white,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: AppColors.border,
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                  child: TextField(
+                                    controller: _commentController,
+                                    maxLines: 3,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      color: AppColors.textDark,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    decoration: InputDecoration(
+                                      hintText: 'Tell us more about your experience...',
+                                      hintStyle: const TextStyle(
+                                        color: AppColors.textMedium,
+                                        fontSize: 13,
+                                      ),
+                                      contentPadding: const EdgeInsets.all(14),
+                                      border: InputBorder.none,
+                                      prefixIcon: Icon(
+                                        Icons.rate_review_outlined,
+                                        color: AppColors.textMedium.withValues(alpha: 0.6),
+                                        size: 20,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ],
-                            ],
+                            ),
                           ),
-                        ),
-                      ),
-                    ],
-                    const Spacer(flex: 3),
-                    if (!_submitted)
-                      FadeTransition(
-                        opacity: _fadeCtrl,
-                        child: PrimaryButton(
-                          text: 'Submit',
-                          onPressed: _submit,
-                        ),
-                      ),
-                    if (_submitted)
-                      const SizedBox(
-                        width: 28,
-                        height: 28,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
+                        ],
+                      ],
+
+                      const Spacer(flex: 2),
+
+                      // Actions Button
+                      if (!_submitted)
+                        FadeTransition(
+                          opacity: _fadeCtrl,
+                          child: PrimaryButton(
+                            text: 'Submit Feedback',
+                            onPressed: _rating > 0 ? _submit : () {},
+                            backgroundColor: _rating > 0 ? null : AppColors.border,
+                            textColor: _rating > 0 ? null : AppColors.textMedium.withValues(alpha: 0.5),
+                          ),
+                        )
+                      else ...[
+                        const CircularProgressIndicator(
+                          strokeWidth: 3,
                           valueColor: AlwaysStoppedAnimation<Color>(
                             AppColors.primaryGreen,
                           ),
                         ),
-                      ),
-                    const SizedBox(height: 32),
-                  ],
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Redirecting home...',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textMedium,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 24),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -272,5 +461,26 @@ class _RatingScreenState extends State<RatingScreen>
       default:
         return '';
     }
+  }
+}
+
+class _DriverAvatarFallback extends StatelessWidget {
+  final String name;
+  const _DriverAvatarFallback({required this.name});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: AppColors.primary,
+      alignment: Alignment.center,
+      child: Text(
+        name.isNotEmpty ? name[0].toUpperCase() : '?',
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 24,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
   }
 }

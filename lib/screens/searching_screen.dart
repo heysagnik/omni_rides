@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart' as lt;
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
 import '../theme/app_colors.dart';
+import '../theme/map_style.dart';
 import '../widgets/cancel_modal.dart';
 import '../routes/app_router.dart';
 import '../services/ride_service.dart';
@@ -83,7 +84,7 @@ class _SearchingScreenState extends State<SearchingScreen>
     final otp = (r['otp'] ?? r['rideOtp'] ?? r['ride_otp'])?.toString() ?? '';
     if (otp.isNotEmpty) state.setOtp(otp);
 
-    final fare = (r['estimatedFare'] ?? r['estimated_fare'] as num?)?.toDouble();
+    final fare = _toDouble(r['estimatedFare'] ?? r['estimated_fare']);
     if (fare != null && fare > 0) state.setEstimatedFare(fare);
 
     _startPolling(rideId);
@@ -143,14 +144,19 @@ class _SearchingScreenState extends State<SearchingScreen>
             driver['plate'] ?? driver['vehiclePlate'] ?? driver['licensePlate'] ??
             d['plate'] ?? '').toString();
 
-    final rating = ((driver['rating'] ?? driver['averageRating'] ??
-                d['driver_rating'] ?? d['driverRating']) as num?)?.toDouble() ?? 4.5;
-
+    final rating = _toDouble(driver['rating'] ?? driver['averageRating'] ??
+                d['driver_rating'] ?? d['driverRating']) ?? 4.5;
+ 
     final phone = (driver['phone'] ?? driver['phoneNumber'] ?? driver['phone_number'] ??
             d['driver_phone'] ?? d['driverPhone'] ?? '').toString();
+ 
+    final lat = _toDouble(driver['lat'] ?? driver['latitude'] ?? d['driver_lat']) ?? state.pickupLat;
+    final lng = _toDouble(driver['lng'] ?? driver['longitude'] ?? d['driver_lng']) ?? state.pickupLng;
 
-    final lat = ((driver['lat'] ?? driver['latitude'] ?? d['driver_lat']) as num?)?.toDouble() ?? state.pickupLat;
-    final lng = ((driver['lng'] ?? driver['longitude'] ?? d['driver_lng']) as num?)?.toDouble() ?? state.pickupLng;
+    final driverId = (driver['id'] ?? driver['driverId'] ?? d['driverId'] ?? d['driver_id'] ?? '').toString();
+    if (driverId.isNotEmpty) {
+      state.fetchAndSetDriverDetails(driverId);
+    }
 
     final eta = ((d['eta'] ?? d['etaMinutes'] ?? d['eta_minutes']) as num?)?.toInt() ?? 5;
 
@@ -287,8 +293,9 @@ class _SearchingScreenState extends State<SearchingScreen>
                 state.pickupLat != 0 ? state.pickupLat : 12.9716,
                 state.pickupLng != 0 ? state.pickupLng : 77.5946,
               ),
-              zoom: 14,
+              zoom: 16,
             ),
+            style: MapStyles.premiumStyle,
             myLocationEnabled: false,
             zoomControlsEnabled: false,
             mapToolbarEnabled: false,
@@ -452,5 +459,12 @@ class _SearchingScreenState extends State<SearchingScreen>
         ],
       ),
     );
+  }
+
+  double? _toDouble(dynamic val) {
+    if (val == null) return null;
+    if (val is num) return val.toDouble();
+    if (val is String) return double.tryParse(val);
+    return null;
   }
 }

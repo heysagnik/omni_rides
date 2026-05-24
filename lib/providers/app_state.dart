@@ -39,6 +39,7 @@ class AppState extends ChangeNotifier {
   double _driverLat = 0;
   double _driverLng = 0;
   int _etaMinutes = 0;
+  String _driverPhotoUrl = '';
 
   final List<Map<String, dynamic>> _rideHistory = [];
 
@@ -73,6 +74,7 @@ class AppState extends ChangeNotifier {
   double get driverLat => _driverLat;
   double get driverLng => _driverLng;
   int get etaMinutes => _etaMinutes;
+  String get driverPhotoUrl => _driverPhotoUrl;
   List<Map<String, dynamic>> get rideHistory => _rideHistory;
 
   void setUserInfo({
@@ -288,6 +290,7 @@ class AppState extends ChangeNotifier {
     _paymentMethod = '';
     _rideId = '';
     _paymentId = '';
+    _driverPhotoUrl = '';
     notifyListeners();
   }
 
@@ -301,43 +304,51 @@ class AppState extends ChangeNotifier {
 
   Future<String?> checkAndRestoreActiveRide() async {
     final ride = await RideService().getActiveRide();
+    debugPrint('Active ride fetched on startup: ID=${ride?['id']}, status=${ride?['status']}');
     if (ride == null) return null;
 
     final id = ride['id']?.toString() ?? '';
     if (id.isEmpty) return null;
 
-    _rideId = id;
-    _pickupAddress = ride['pickup_address'] as String? ??
-        ride['pickup']?['address'] as String? ??
-        '';
-    _destinationAddress = ride['drop_address'] as String? ??
-        ride['drop']?['address'] as String? ??
-        '';
-    _pickupLat = (ride['pickup_lat'] ?? ride['pickup']?['lat'] ?? 0).toDouble();
-    _pickupLng = (ride['pickup_lng'] ?? ride['pickup']?['lng'] ?? 0).toDouble();
-    _destinationLat =
-        (ride['drop_lat'] ?? ride['drop']?['lat'] ?? 0).toDouble();
-    _destinationLng =
-        (ride['drop_lng'] ?? ride['drop']?['lng'] ?? 0).toDouble();
-    _estimatedFare =
-        (ride['estimated_fare'] ?? ride['estimatedFare'] ?? 0).toDouble();
-    _rideOtp = ride['otp']?.toString() ?? '';
-
     final status = ride['status'] as String? ?? '';
+    debugPrint('Restoration check: ride status is $status');
+    if (status == 'completed' || status == 'ride_completed') {
+      debugPrint('Ignoring restoration of completed ride');
+      return null;
+    }
+
+    _rideId = id;
+    _pickupAddress = (ride['pickupAddress'] ?? '').toString();
+    _destinationAddress = (ride['dropAddress'] ?? '').toString();
+    _pickupLat = _toDouble(ride['pickupLat']);
+    _pickupLng = _toDouble(ride['pickupLng']);
+    _destinationLat = _toDouble(ride['dropLat']);
+    _destinationLng = _toDouble(ride['dropLng']);
+    _estimatedFare = _toDouble(ride['estimatedFare']);
+    _rideOtp = ride['otpCode']?.toString() ?? '';
+    _paymentMethod = (ride['paymentMethod'] ?? 'cash').toString();
+    
+    // Restore estimated distance or calculate a fallback
+    _estimatedDistance = _toDouble(ride['distance'] ?? ride['estimatedDistance'] ?? _approxDistanceKm(_destinationLat, _destinationLng));
+
     final driver = ride['driver'] as Map<String, dynamic>? ?? {};
 
     void restoreDriver() {
-      _driverName =
-          driver['name'] as String? ?? ride['driver_name'] as String? ?? '';
-      _driverVehicle =
-          driver['vehicle'] as String? ?? '';
-      _driverPlate = driver['plate'] as String? ??
-          driver['vehiclePlate'] as String? ??
-          '';
-      _driverRating = (driver['rating'] ?? 4.5).toDouble();
-      _driverPhone = driver['phone'] as String? ?? '';
-      _driverLat = (driver['lat'] ?? driver['latitude'] ?? 0).toDouble();
-      _driverLng = (driver['lng'] ?? driver['longitude'] ?? 0).toDouble();
+      _driverName = (driver['name'] ?? driver['fullName'] ?? '').toString();
+
+      final vehicleRaw = driver['vehicle'];
+      final vehicleObj = vehicleRaw is Map<String, dynamic> ? vehicleRaw : null;
+      _driverVehicle = vehicleObj != null
+          ? (vehicleObj['model'] ?? '').toString()
+          : (vehicleRaw ?? driver['vehicleModel'] ?? '').toString();
+
+      _driverPlate = (vehicleObj?['plate'] ?? driver['vehiclePlate'] ?? '').toString();
+
+      _driverRating = _toDouble(driver['rating'] ?? driver['averageRating'] ?? 4.5);
+      _driverPhone = (driver['phone'] ?? driver['phoneNumber'] ?? '').toString();
+      _driverLat = _toDouble(driver['lat'] ?? driver['latitude']);
+      _driverLng = _toDouble(driver['lng'] ?? driver['longitude']);
+      _etaMinutes = _toDouble(driver['eta'] ?? ride['etaMinutes'] ?? 5).toInt();
     }
 
     if (status == 'searching') {
@@ -346,20 +357,33 @@ class AppState extends ChangeNotifier {
       return null;
     }
 
+    final isRideStarted = status == 'ride_started' ||
+        status == 'in_progress' ||
+        ride['startedAt'] != null ||
+        ride['otpVerified'] == true;
+
+    if (isRideStarted) {
+      restoreDriver();
+      _rideStatus = 'in_transit';
+      final driverId = (ride['driverId'] ?? driver['id'] ?? '').toString();
+      if (driverId.isNotEmpty) {
+        fetchAndSetDriverDetails(driverId);
+      }
+      notifyListeners();
+      return 'inTransit';
+    }
+
     if (status == 'driver_assigned' ||
         status == 'driver_en_route' ||
         status == 'driver_arrived') {
       restoreDriver();
       _rideStatus = 'matched';
+      final driverId = (ride['driverId'] ?? driver['id'] ?? '').toString();
+      if (driverId.isNotEmpty) {
+        fetchAndSetDriverDetails(driverId);
+      }
       notifyListeners();
       return 'driverMatched';
-    }
-
-    if (status == 'ride_started' || status == 'in_progress') {
-      restoreDriver();
-      _rideStatus = 'in_transit';
-      notifyListeners();
-      return 'inTransit';
     }
 
     return null;
@@ -369,5 +393,29 @@ class AppState extends ChangeNotifier {
     final dLat = (destLat - _pickupLat).abs();
     final dLng = (destLng - _pickupLng).abs();
     return ((dLat + dLng) * 111).clamp(1.0, 500.0);
+  }
+
+  double _toDouble(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
+  }
+
+  Future<void> fetchAndSetDriverDetails(String driverId) async {
+    if (driverId.isEmpty) return;
+    try {
+      final data = await RideService().getDriverDetails(driverId);
+      if (data == null) return;
+
+      _driverName = (data['fullName'] ?? _driverName).toString();
+      _driverPhotoUrl = (data['photoUrl'] ?? _driverPhotoUrl).toString();
+      _driverPlate = (data['vehiclePlateNumber'] ?? _driverPlate).toString();
+      _driverVehicle = (data['vehicleType'] ?? _driverVehicle).toString();
+      _driverRating = _toDouble(data['rating'] ?? _driverRating);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('[AppState] Error fetching driver details: $e');
+    }
   }
 }

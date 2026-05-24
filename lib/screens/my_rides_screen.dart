@@ -5,8 +5,6 @@ import '../providers/app_state.dart';
 import '../theme/app_colors.dart';
 import '../services/ride_service.dart';
 
-import '../routes/app_router.dart';
-
 class MyRidesScreen extends StatefulWidget {
   const MyRidesScreen({super.key});
 

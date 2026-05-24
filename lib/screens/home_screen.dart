@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/app_state.dart';
 import '../theme/app_colors.dart';
+import '../theme/map_style.dart';
 import '../routes/app_router.dart';
 import '../services/location_service.dart';
 import '../services/ride_service.dart';
@@ -327,7 +328,7 @@ class _HomeScreenState extends State<HomeScreen> {
               if (s.currentLat != 0) _moveCamera(LatLng(s.currentLat, s.currentLng));
             },
             initialCameraPosition: CameraPosition(target: _cameraTarget, zoom: 15),
-            style: _mapStyle,
+            style: MapStyles.premiumStyle,
             myLocationEnabled: true,
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
@@ -675,24 +676,3 @@ class _LocationPulseDotState extends State<LocationPulseDot> with SingleTickerPr
     );
   }
 }
-
-const String _mapStyle = '''
-[
-  {"featureType":"all","elementType":"geometry","stylers":[{"color":"#f0ede8"}]},
-  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#b8d8ea"}]},
-  {"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#7ca8c0"}]},
-  {"featureType":"road","elementType":"geometry","stylers":[{"color":"#ffffff"}]},
-  {"featureType":"road.arterial","elementType":"geometry","stylers":[{"color":"#ffffff"}]},
-  {"featureType":"road.highway","elementType":"geometry.fill","stylers":[{"color":"#ffe082"}]},
-  {"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#f0c040","weight":0.5}]},
-  {"featureType":"road","elementType":"labels.text.fill","stylers":[{"color":"#6b6b6b"}]},
-  {"featureType":"road","elementType":"labels.icon","stylers":[{"visibility":"off"}]},
-  {"featureType":"poi","stylers":[{"visibility":"off"}]},
-  {"featureType":"poi.park","elementType":"geometry","stylers":[{"color":"#d4e8c8"}]},
-  {"featureType":"transit","stylers":[{"visibility":"off"}]},
-  {"featureType":"administrative.locality","elementType":"labels.text.fill","stylers":[{"color":"#444444"}]},
-  {"featureType":"administrative.neighborhood","elementType":"labels.text.fill","stylers":[{"color":"#888888"}]},
-  {"featureType":"landscape.man_made","elementType":"geometry","stylers":[{"color":"#e8e4de"}]},
-  {"featureType":"landscape.natural","elementType":"geometry","stylers":[{"color":"#e4edd8"}]}
-]
-''';
