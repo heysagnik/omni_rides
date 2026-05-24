@@ -17,6 +17,30 @@ import 'home/widgets/search_body.dart';
 
 enum _Mode { idle, searching }
 
+/// Maps a stored icon codePoint back to a constant [IconData].
+/// Add entries here whenever a new icon type is saved to recent places.
+IconData _iconFromCode(int code) {
+  const map = <int, IconData>{
+    0xe3ab: Icons.home_outlined,
+    0xe318: Icons.home,
+    0xe155: Icons.work_outlined,
+    0xe943: Icons.work,
+    0xe0c8: Icons.location_on,
+    0xe0c7: Icons.location_on_outlined,
+    0xe55f: Icons.star,
+    0xe5f9: Icons.star_border,
+    0xe532: Icons.favorite,
+    0xe533: Icons.favorite_border,
+    0xe540: Icons.flight,
+    0xe530: Icons.fastfood,
+    0xe56d: Icons.school,
+    0xe88a: Icons.local_hospital,
+    0xe8b4: Icons.restaurant,
+    0xe7f0: Icons.person_pin_circle,
+  };
+  return map[code] ?? Icons.location_on_outlined;
+}
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -90,7 +114,7 @@ class _HomeScreenState extends State<HomeScreen> {
             return PlaceItem(
               map['name'] as String,
               map['subtitle'] as String,
-              IconData(iconCode, fontFamily: 'MaterialIcons'),
+              _iconFromCode(iconCode),
               lat: map['lat'] as double?,
               lng: map['lng'] as double?,
             );
