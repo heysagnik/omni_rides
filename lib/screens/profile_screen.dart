@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
 import '../theme/app_colors.dart';
@@ -15,11 +16,15 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final AuthService _authService = AuthService();
+  String _version = '';
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadProfile());
+    PackageInfo.fromPlatform().then((info) {
+      if (mounted) setState(() => _version = 'v${info.version}');
+    });
   }
 
   Future<void> _loadProfile() async {
@@ -170,8 +175,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _MenuItem(
                   icon: PhosphorIconsRegular.clockCounterClockwise,
                   label: 'Activity',
-                  iconColor: const Color(0xFF6C63FF),
-                  bgColor: const Color(0xFFF0EFFF),
+                  iconColor: const Color(0xFF1C683C),
+                  bgColor: const Color(0xFFE8F3EC),
                   onTap: () => Navigator.pushNamed(context, AppRouter.myRides),
                 ),
                 _MenuItem(
@@ -190,8 +195,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _MenuItem(
                   icon: PhosphorIconsRegular.info,
                   label: 'About Omni',
-                  iconColor: const Color(0xFF38B000),
-                  bgColor: const Color(0xFFEBF7E5),
+                  iconColor: const Color(0xFF1C683C),
+                  bgColor: const Color(0xFFE8F3EC),
                 ),
               ]),
 
@@ -218,6 +223,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   },
                 ),
               ]),
+
+              if (_version.isNotEmpty) ...[
+                const SizedBox(height: 24),
+                Text(
+                  _version,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textLight,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ],
             ],
           ),
         ),

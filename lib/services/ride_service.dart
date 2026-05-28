@@ -75,6 +75,63 @@ class RideService {
     }
   }
 
+  // Fetch fare estimates for all ride types in one call.
+  // Returns { distanceKm, durationMin, options: { human: {...}, parcel: {...} } }
+  Future<Map<String, dynamic>?> getFareEstimates({
+    required double pickupLat,
+    required double pickupLng,
+    required double dropLat,
+    required double dropLng,
+  }) async {
+    try {
+      final response = await _apiService.get(
+        '/ride/fare-estimate?pickupLat=$pickupLat&pickupLng=$pickupLng&dropLat=$dropLat&dropLng=$dropLng',
+      );
+      if (response.statusCode == 200) return jsonDecode(response.body);
+      return null;
+    } catch (e) {
+      debugPrint('Error fetching fare estimates: $e');
+      return null;
+    }
+  }
+
+  // GET /ride/offers — returns list of available promotional offers
+  Future<List<dynamic>?> getOffers() async {
+    try {
+      final response = await _apiService.get('/ride/offers');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['offers'] as List<dynamic>?;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error fetching offers: $e');
+      return null;
+    }
+  }
+
+  // POST /ride/validate-coupon — validates code and returns { code, discount, finalFare }
+  Future<Map<String, dynamic>?> validateCoupon({
+    required String code,
+    required int fare,
+  }) async {
+    try {
+      final response = await _apiService.post('/ride/validate-coupon', body: {
+        'code': code,
+        'fare': fare,
+      });
+      if (response.statusCode == 200) return jsonDecode(response.body);
+      if (response.statusCode == 404) {
+        final body = jsonDecode(response.body);
+        return {'error': body['error'] ?? 'Invalid coupon'};
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error validating coupon: $e');
+      return null;
+    }
+  }
+
   // Request Ride — returns { rideId, estimatedFare, ... }
   Future<Map<String, dynamic>?> requestRide({
     required LatLng pickup,
@@ -83,9 +140,10 @@ class RideService {
     required String dropAddress,
     String rideType = 'human',
     String paymentMethod = 'cash',
+    String? couponCode,
   }) async {
     try {
-      final response = await _apiService.post('/ride/request', body: {
+      final body = <String, dynamic>{
         'pickup': {
           'lat': pickup.latitude,
           'lng': pickup.longitude,
@@ -98,7 +156,11 @@ class RideService {
         },
         'rideType': rideType,
         'paymentMethod': paymentMethod,
-      });
+      };
+      if (couponCode != null && couponCode.isNotEmpty) {
+        body['couponCode'] = couponCode;
+      }
+      final response = await _apiService.post('/ride/request', body: body);
       if (response.statusCode == 200 || response.statusCode == 201 || response.statusCode == 202) {
         return jsonDecode(response.body);
       }
@@ -107,6 +169,14 @@ class RideService {
     } catch (e) {
       debugPrint('Error requesting ride: $e');
       return null;
+    }
+  }
+
+  Future<void> retryMatching(String rideId) async {
+    try {
+      await _apiService.post('/ride/$rideId/retry-matching', body: {});
+    } catch (e) {
+      debugPrint('Error retrying matching: $e');
     }
   }
 
@@ -230,6 +300,7 @@ class RideService {
   // 'searching' is intentionally excluded — on cold app launch a lingering
   // searching ride is stale and should NOT be resumed.
   static const _activeStatuses = [
+    'searching',
     'driver_assigned',
     'driver_en_route',
     'driver_arrived',

@@ -10,6 +10,7 @@ import '../theme/app_colors.dart';
 import '../theme/map_style.dart';
 import '../routes/app_router.dart';
 import '../services/location_service.dart';
+import '../services/location_guard_mixin.dart';
 import '../services/ride_service.dart';
 import 'home/widgets/home_widgets.dart';
 import 'home/widgets/idle_body.dart';
@@ -48,7 +49,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with LocationGuardMixin<HomeScreen> {
   GoogleMapController? _mapController;
   _Mode _mode = _Mode.idle;
 
@@ -75,10 +76,12 @@ class _HomeScreenState extends State<HomeScreen> {
     _pickupFocus.addListener(_onPickupFocusChange);
     _destFocus.addListener(_onDestFocusChange);
     WidgetsBinding.instance.addPostFrameCallback((_) => _initLocation());
+    initLocationGuard();
   }
 
   @override
   void dispose() {
+    disposeLocationGuard();
     _pickupFocus.removeListener(_onPickupFocusChange);
     _destFocus.removeListener(_onDestFocusChange);
     _mapController?.dispose();
@@ -422,7 +425,7 @@ class _HomeScreenState extends State<HomeScreen> {
               onType: _onType,
               onPickSuggestion: _pick,
               onPickRecent: _enterSearch,
-              onBook: () => Navigator.pushNamed(context, AppRouter.searching),
+              onBook: () => Navigator.pushNamed(context, AppRouter.farePreview),
               onDragUpdate: _onVerticalDragUpdate,
               onDragEnd: _onVerticalDragEnd,
             ),

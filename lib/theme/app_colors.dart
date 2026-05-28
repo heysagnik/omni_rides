@@ -1,54 +1,51 @@
 import 'package:flutter/material.dart';
 
-/// A curated, high-fidelity pastel color palette designed for a premium,
-/// soothing, and visually balanced user experience.
-///
-/// Replaces harsh primary colors and pure blacks with harmonized slate,
-/// soft emerald sage, peach amber, and light sky blues.
+/// Centralized color palette for the Omni User app.
+/// Brand color: Omni Green #1C683C
 class AppColors {
   AppColors._();
 
-  // Primary — Soft Emerald Sage Mint Pastel (Refreshing and high-fidelity)
-  static const Color primary = Color(0xFF7FCD91);
-  static const Color primaryLight = Color(0xFFAAE3BA);
-  static const Color primaryDark = Color(0xFF5B9E6D);
-  static const Color primaryGreen = Color(0xFF7FCD91); // alias
-  static const Color primaryGreenLight = Color(0xFFAAE3BA); // alias
-  static const Color primaryGreenDark = Color(0xFF5B9E6D); // alias
+  // ── Brand Colors ──────────────────────────────────────────────
+  static const Color primary = Color(0xFF1C683C);        // Omni Green
+  static const Color primaryLight = Color(0xFF2A8A52);   // Lighter Omni Green
+  static const Color primaryDark = Color(0xFF0F4A28);    // Deeper Omni Green
+  static const Color primaryGreen = Color(0xFF1C683C);   // alias
+  static const Color primaryGreenLight = Color(0xFF2A8A52); // alias
+  static const Color primaryGreenDark = Color(0xFF0F4A28);  // alias
 
-  // Accent — Soft Peach Apricot Pastel (Warm and inviting)
-  static const Color accent = Color(0xFFFFB74D);
-  static const Color accentDark = Color(0xFFFFA726);
+  // ── Accent ───────────────────────────────────────────────────
+  static const Color accent = Color(0xFFF5C518);         // Omni Yellow
+  static const Color accentDark = Color(0xFFD4A800);     // Deeper Yellow
 
-  // Surface / Backgrounds
+  // ── Surface / Backgrounds ────────────────────────────────────
   static const Color white = Color(0xFFFFFFFF);
-  static const Color background = Color(0xFFF9FBFC); // soft clean sky background
-  static const Color backgroundGrey = Color(0xFFF3F6F8); // warm grey-blue tint
+  static const Color background = Color(0xFFF6FAF7);     // Green-tinted off-white
+  static const Color backgroundGrey = Color(0xFFEFF4F0); // Warm grey-green
   static const Color surface = Color(0xFFFFFFFF);
-  static const Color surfaceGrey = Color(0xFFECF0F3);
+  static const Color surfaceGrey = Color(0xFFE8F0EA);
   static const Color cardBg = Color(0xFFF9FAFB);
 
-  // Text — Soft Slate Blue-Greys (Much more premium than harsh pure black)
-  static const Color textDark = Color(0xFF2C3E50);
-  static const Color textMedium = Color(0xFF78909C);
-  static const Color textLight = Color(0xFFCFD8DC);
+  // ── Text ─────────────────────────────────────────────────────
+  static const Color textDark = Color(0xFF111C16);       // Near-black green cast
+  static const Color textMedium = Color(0xFF4F6657);     // Muted green-grey
+  static const Color textLight = Color(0xFF94A89D);      // Subtle grey-green
   static const Color textWhite = Color(0xFFFFFFFF);
 
-  // Semantic (Soft Pastel Tones)
-  static const Color success = Color(0xFF81C784); // Soft Sage Green
-  static const Color warning = Color(0xFFFFD54F); // Soft Apricot Yellow
-  static const Color error = Color(0xFFE57373);   // Soft Coral Red
-  static const Color info = Color(0xFF64B5F6);    // Soft Sky Blue
+  // ── Semantic ─────────────────────────────────────────────────
+  static const Color success = Color(0xFF1C683C);
+  static const Color warning = Color(0xFFF5C518);
+  static const Color error = Color(0xFFE53935);
+  static const Color info = Color(0xFF1565C0);
 
-  // Rating
-  static const Color starFilled = Color(0xFFFFD54F);
-  static const Color starEmpty = Color(0xFFECEFF1);
+  // ── Rating ───────────────────────────────────────────────────
+  static const Color starFilled = Color(0xFFF5C518);
+  static const Color starEmpty = Color(0xFFDDE6E0);
 
-  // Divider / Border
-  static const Color divider = Color(0xFFECEFF1);
-  static const Color border = Color(0xFFECEFF1);
+  // ── Divider / Border ─────────────────────────────────────────
+  static const Color divider = Color(0xFFE4EDE7);
+  static const Color border = Color(0xFFE4EDE7);
 
-  // Shadows
+  // ── Shadows ──────────────────────────────────────────────────
   static const Color cardShadow = Color(0x06000000);
   static const Color shadowMedium = Color(0x0C000000);
 }

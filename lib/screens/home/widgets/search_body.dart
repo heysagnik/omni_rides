@@ -129,7 +129,7 @@ class SearchBody extends StatelessWidget {
               ),
               icon: const Icon(Icons.local_taxi_rounded, size: 20),
               label: const Text(
-                'Find Cabs',
+                'Find Rides',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
               ),
             ),

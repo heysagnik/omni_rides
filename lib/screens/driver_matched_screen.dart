@@ -11,6 +11,7 @@ import '../theme/app_colors.dart';
 import '../theme/map_style.dart';
 import '../routes/app_router.dart';
 import '../services/ride_service.dart';
+import '../utils/vehicle_marker.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -82,10 +83,11 @@ class _DriverMatchedScreenState extends State<DriverMatchedScreen> {
 
     // Driver marker + route
     if (dLat != 0 && pLat != 0) {
+      final vehicleIcon = await buildVehicleMarker(state.selectedRideType);
       markers.add(Marker(
         markerId: const MarkerId('driver'),
         position: LatLng(dLat, dLng),
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+        icon: vehicleIcon,
         infoWindow: InfoWindow(title: state.driverName.isNotEmpty ? state.driverName : 'Driver'),
       ));
 

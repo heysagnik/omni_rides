@@ -350,7 +350,7 @@ class _RouteSelectionScreenState extends State<RouteSelectionScreen> {
                     padding: EdgeInsets.fromLTRB(16, 12, 16, 24 + bottomPad),
                     child: FilledButton(
                       onPressed: () =>
-                          Navigator.pushNamed(context, AppRouter.searching),
+                          Navigator.pushNamed(context, AppRouter.farePreview),
                       style: FilledButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         foregroundColor: AppColors.white,
@@ -365,7 +365,7 @@ class _RouteSelectionScreenState extends State<RouteSelectionScreen> {
                           Icon(Icons.directions_car_rounded, size: 20),
                           SizedBox(width: 10),
                           Text(
-                            'Find a ride',
+                            'See prices',
                             style: TextStyle(
                                 fontSize: 16, fontWeight: FontWeight.w700),
                           ),

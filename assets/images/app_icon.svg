@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400&amp;display=swap');
+    </style>
+    <clipPath id="iconClip">
+      <rect width="1024" height="1024" rx="200" ry="200"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#iconClip)">
+    <rect width="1024" height="1024" fill="#1c683c"/>
+
+    <!-- Pill mark -->
+    <rect x="152" y="220" width="720" height="256" rx="128" ry="128"
+      fill="none" stroke="#FFFFFF" stroke-width="64"/>
+
+    <!-- Omni wordmark -->
+    <text x="512" y="740"
+      font-family="'DM Sans', 'Helvetica Neue', Arial, sans-serif"
+      font-size="180"
+      font-weight="400"
+      fill="#FFFFFF"
+      text-anchor="middle"
+      letter-spacing="-2">Omni</text>
+  </g>
+</svg>

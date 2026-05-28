@@ -43,7 +43,14 @@ class _SearchingScreenState extends State<SearchingScreen>
       if (_elapsed >= _timeout) _handleTimeout();
     });
 
-    WidgetsBinding.instance.addPostFrameCallback((_) => _requestRide());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final existingId = context.read<AppState>().rideId;
+      if (existingId.isNotEmpty) {
+        _startPolling(existingId);
+      } else {
+        _requestRide();
+      }
+    });
   }
 
   @override
@@ -61,7 +68,9 @@ class _SearchingScreenState extends State<SearchingScreen>
       pickupAddress: state.pickupAddress,
       drop: lt.LatLng(state.destinationLat, state.destinationLng),
       dropAddress: state.destinationAddress,
-      paymentMethod: 'cash',
+      rideType: state.selectedRideType,
+      paymentMethod: state.paymentMethod.isEmpty ? 'cash' : state.paymentMethod,
+      couponCode: state.appliedCoupon.isNotEmpty ? state.appliedCoupon : null,
     );
 
     if (!mounted) return;
@@ -214,6 +223,8 @@ class _SearchingScreenState extends State<SearchingScreen>
 
   void _extendSearch() {
     if (!mounted) return;
+    _elapsedTimer?.cancel();
+    _pollTimer?.cancel();
     setState(() => _elapsed = 0);
     _elapsedTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
@@ -222,6 +233,7 @@ class _SearchingScreenState extends State<SearchingScreen>
     });
     final state = context.read<AppState>();
     if (state.rideId.isNotEmpty) {
+      _rideService.retryMatching(state.rideId);
       _startPolling(state.rideId);
     } else {
       _requestRide();
@@ -378,7 +390,7 @@ class _SearchingScreenState extends State<SearchingScreen>
                                 '₹${state.estimatedFare.toStringAsFixed(0)}',
                                 style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.primary),
                               ),
-                              const Text('Estimated fare',
+                              const Text('Final fare',
                                   style: TextStyle(fontSize: 12, color: AppColors.textMedium)),
                             ],
                           ),

@@ -30,6 +30,8 @@ class AppState extends ChangeNotifier {
   String _paymentMethod = '';
   String _rideId = '';
   String _paymentId = '';
+  String _selectedRideType = 'human';
+  String _appliedCoupon = '';
 
   String _driverName = '';
   String _driverVehicle = '';
@@ -66,6 +68,8 @@ class AppState extends ChangeNotifier {
   String get paymentMethod => _paymentMethod;
   String get rideId => _rideId;
   String get paymentId => _paymentId;
+  String get selectedRideType => _selectedRideType;
+  String get appliedCoupon => _appliedCoupon;
   String get driverName => _driverName;
   String get driverVehicle => _driverVehicle;
   String get driverPlate => _driverPlate;
@@ -106,15 +110,14 @@ class AppState extends ChangeNotifier {
           profile['name'] as String? ??
           '';
       _userEmail = firebaseUser?.email ?? profile['email'] as String? ?? '';
-      _userPhone = firebaseUser?.phoneNumber ??
-          profile['phoneNumber'] as String? ??
-          '';
+      _userPhone = '';
       _userPhotoUrl =
           firebaseUser?.photoURL ?? profile['photoUrl'] as String? ?? '';
       _isLoggedIn = true;
       notifyListeners();
       NotificationService().registerToken();
       if (profile['isNewUser'] == true) return 'new_user';
+      if (profile['hasPhone'] == false) return 'needs_phone';
       return 'home';
     }
 
@@ -202,6 +205,16 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setAppliedCoupon(String code) {
+    _appliedCoupon = code;
+    notifyListeners();
+  }
+
+  void setSelectedRideType(String type) {
+    _selectedRideType = type;
+    notifyListeners();
+  }
+
   void driverMatched({
     required String name,
     required String vehicle,
@@ -278,6 +291,7 @@ class AppState extends ChangeNotifier {
     _destinationLng = 0;
     _estimatedFare = 0;
     _estimatedDistance = 0;
+    _appliedCoupon = '';
     _rideOtp = '';
     _driverName = '';
     _driverVehicle = '';
@@ -352,9 +366,9 @@ class AppState extends ChangeNotifier {
     }
 
     if (status == 'searching') {
-      RideService().cancelRide(id, 'App relaunch');
-      _rideId = '';
-      return null;
+      _rideStatus = 'searching';
+      notifyListeners();
+      return 'searching';
     }
 
     final isRideStarted = status == 'ride_started' ||

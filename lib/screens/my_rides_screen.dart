@@ -113,13 +113,13 @@ class _MyRidesScreenState extends State<MyRidesScreen> {
                     width: 90,
                     height: 90,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF0EFFF),
+                      color: const Color(0xFFE8F3EC),
                       borderRadius: BorderRadius.circular(28),
                     ),
                     child: const Icon(
                       PhosphorIconsRegular.carProfile,
                       size: 44,
-                      color: Color(0xFF6C63FF),
+                      color: Color(0xFF1C683C),
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -516,8 +516,8 @@ class _RideHistoryCardState extends State<_RideHistoryCard> {
     final isCompleted = status == 'ride_completed';
 
     String text = 'Active';
-    Color color = const Color(0xFFFF9F1C);
-    Color bgColor = const Color(0xFFFFF5E5);
+    Color color = const Color(0xFF1C683C);
+    Color bgColor = const Color(0xFFE8F3EC);
 
     if (isCompleted) {
       text = 'Completed';

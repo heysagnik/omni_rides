@@ -7,6 +7,7 @@ import '../theme/app_colors.dart';
 import '../theme/map_style.dart';
 import '../routes/app_router.dart';
 import '../services/ride_service.dart';
+import '../utils/vehicle_marker.dart';
 import '../services/safety_service.dart';
 import '../widgets/hold_to_activate_button.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -37,6 +38,8 @@ class _InTransitScreenState extends State<InTransitScreen>
 
   late AnimationController _pulseController;
   Set<Polyline> _polylines = {};
+  BitmapDescriptor _vehicleIcon =
+      BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure);
 
   @override
   void initState() {
@@ -45,7 +48,7 @@ class _InTransitScreenState extends State<InTransitScreen>
     _etaMinutes = state.etaMinutes;
     _originalEta = state.etaMinutes;
     _distanceKm = state.estimatedDistance;
-    
+
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 1),
@@ -56,7 +59,14 @@ class _InTransitScreenState extends State<InTransitScreen>
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _fetchExactPath();
+      _loadVehicleIcon();
     });
+  }
+
+  Future<void> _loadVehicleIcon() async {
+    final rideType = context.read<AppState>().selectedRideType;
+    final icon = await buildVehicleMarker(rideType);
+    if (mounted) setState(() => _vehicleIcon = icon);
   }
 
   // Poll ride status and track location every 5 s for real-time updates
@@ -403,9 +413,7 @@ class _InTransitScreenState extends State<InTransitScreen>
                   Marker(
                     markerId: const MarkerId('driver'),
                     position: LatLng(state.driverLat, state.driverLng),
-                    icon: BitmapDescriptor.defaultMarkerWithHue(
-                      BitmapDescriptor.hueAzure,
-                    ),
+                    icon: _vehicleIcon,
                     infoWindow: InfoWindow(
                       title: state.driverName.isNotEmpty
                           ? state.driverName
