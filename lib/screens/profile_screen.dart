@@ -5,7 +5,7 @@ import '../providers/app_state.dart';
 import '../theme/app_colors.dart';
 import '../services/auth_service.dart';
 import '../routes/app_router.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});

@@ -138,7 +138,7 @@ class RideService {
     required String pickupAddress,
     required LatLng drop,
     required String dropAddress,
-    String rideType = 'human',
+    String rideType = 'bike',
     String paymentMethod = 'cash',
     String? couponCode,
   }) async {

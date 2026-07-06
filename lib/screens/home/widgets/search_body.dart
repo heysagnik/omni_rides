@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import '../../../providers/app_state.dart';
 import '../../../theme/app_colors.dart';
 import 'home_widgets.dart';
@@ -127,7 +128,7 @@ class SearchBody extends StatelessWidget {
                 ),
                 elevation: 0,
               ),
-              icon: const Icon(Icons.local_taxi_rounded, size: 20),
+              icon: const Icon(PhosphorIconsRegular.magnifyingGlass, size: 20),
               label: const Text(
                 'Find Rides',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),

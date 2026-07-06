@@ -30,7 +30,7 @@ class AppState extends ChangeNotifier {
   String _paymentMethod = '';
   String _rideId = '';
   String _paymentId = '';
-  String _selectedRideType = 'human';
+  String _selectedRideType = 'bike';
   String _appliedCoupon = '';
 
   String _driverName = '';

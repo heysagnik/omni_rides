@@ -147,8 +147,9 @@ class _AddPhoneScreenState extends State<AddPhoneScreen> {
                   ),
                   validator: (v) {
                     if (v?.trim().isEmpty == true) return 'Phone is required';
-                    if ((v?.trim().length ?? 0) < 10)
+                    if ((v?.trim().length ?? 0) < 10) {
                       return 'Enter a valid 10-digit number';
+                    }
                     return null;
                   },
                 ),

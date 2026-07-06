@@ -9,7 +9,7 @@ import '../theme/map_style.dart';
 import '../widgets/cancel_modal.dart';
 import '../routes/app_router.dart';
 import '../services/ride_service.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 
 class SearchingScreen extends StatefulWidget {
   const SearchingScreen({super.key});

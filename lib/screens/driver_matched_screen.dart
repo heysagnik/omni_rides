@@ -12,7 +12,7 @@ import '../theme/map_style.dart';
 import '../routes/app_router.dart';
 import '../services/ride_service.dart';
 import '../utils/vehicle_marker.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Shows the matched driver details, live ETA, and OTP.

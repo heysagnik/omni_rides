@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
 import '../routes/app_router.dart';
@@ -24,24 +24,22 @@ class _FarePreviewScreenState extends State<FarePreviewScreen> {
 
   double _distanceKm = 0;
   double _durationMin = 0;
-  int _humanFare = 0;
+  int _bikeFare = 0;
+  int _autoFare = 0;
   int _parcelFare = 0;
   double _surgeMult = 1.0;
   String _surgeReason = '';
 
-  List<Map<String, dynamic>> _offers = [];
   String? _appliedCoupon;
   int _discountAmount = 0;
   bool _couponLoading = false;
   String? _couponError;
-  String? _offersError;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _fetchEstimates();
-      _fetchOffers();
     });
   }
 
@@ -70,34 +68,21 @@ class _FarePreviewScreenState extends State<FarePreviewScreen> {
     }
 
     final options = data['options'] as Map<String, dynamic>? ?? {};
-    final human  = options['human']  as Map<String, dynamic>? ?? {};
+    final bike   = options['bike']   as Map<String, dynamic>? ?? {};
+    final auto   = options['auto']   as Map<String, dynamic>? ?? {};
     final parcel = options['parcel'] as Map<String, dynamic>? ?? {};
-    final humanBreakdown = human['breakdown'] as Map<String, dynamic>? ?? {};
+    final bikeBreakdown = bike['breakdown'] as Map<String, dynamic>? ?? {};
 
     setState(() {
       _loading     = false;
       _distanceKm  = (data['distanceKm'] as num?)?.toDouble() ?? 0;
       _durationMin = (data['durationMin'] as num?)?.toDouble() ?? 0;
-      _humanFare   = (human['estimatedFare']  as num?)?.toInt() ?? 0;
+      _bikeFare    = (bike['estimatedFare']   as num?)?.toInt() ?? 0;
+      _autoFare    = (auto['estimatedFare']   as num?)?.toInt() ?? 0;
       _parcelFare  = (parcel['estimatedFare'] as num?)?.toInt() ?? 0;
-      _surgeMult   = (humanBreakdown['surgeMultiplier'] as num?)?.toDouble() ?? 1.0;
-      _surgeReason = (humanBreakdown['surgeReason'] as String?) ?? '';
+      _surgeMult   = (bikeBreakdown['surgeMultiplier'] as num?)?.toDouble() ?? 1.0;
+      _surgeReason = (bikeBreakdown['surgeReason'] as String?) ?? '';
     });
-  }
-
-  Future<void> _fetchOffers() async {
-    final data = await _rideService.getOffers();
-    if (!mounted) return;
-    if (data != null) {
-      setState(() => _offers = List<Map<String, dynamic>>.from(data));
-    } else {
-      setState(() => _offersError = 'Could not load offers');
-    }
-  }
-
-  Future<void> _applyOffer(String code) async {
-    _couponCtrl.text = code;
-    await _applyCoupon();
   }
 
   Future<void> _applyCoupon() async {
@@ -105,7 +90,7 @@ class _FarePreviewScreenState extends State<FarePreviewScreen> {
     if (code.isEmpty) return;
 
     final selectedType = context.read<AppState>().selectedRideType;
-    final baseFare = selectedType == 'parcel' ? _parcelFare : _humanFare;
+    final baseFare = selectedType == 'parcel' ? _parcelFare : (selectedType == 'auto' ? _autoFare : _bikeFare);
 
     setState(() { _couponLoading = true; _couponError = null; });
 
@@ -155,7 +140,7 @@ class _FarePreviewScreenState extends State<FarePreviewScreen> {
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
     final selectedType = state.selectedRideType;
-    final baseFare = selectedType == 'parcel' ? _parcelFare : _humanFare;
+    final baseFare = selectedType == 'parcel' ? _parcelFare : (selectedType == 'auto' ? _autoFare : _bikeFare);
     final finalFare = (baseFare - _discountAmount).clamp(0, baseFare);
 
     return Scaffold(
@@ -195,35 +180,66 @@ class _FarePreviewScreenState extends State<FarePreviewScreen> {
             distanceKm: _distanceKm,
             durationMin: _durationMin,
           ),
-
-          const Divider(height: 1, color: AppColors.divider),
+          
+          const Divider(height: 1, thickness: 1, color: AppColors.backgroundGrey),
 
           // ── Content ──────────────────────────────────────────
           Expanded(
             child: _loading
-                ? const Center(
-                    child: CircularProgressIndicator(
-                      color: AppColors.primary, strokeWidth: 2.5))
+                ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
                 : _error != null
-                    ? _ErrorView(message: _error!, onRetry: _fetchEstimates)
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(PhosphorIconsRegular.warningCircle, size: 48, color: AppColors.error),
+                            const SizedBox(height: 16),
+                            Text(_error!, style: GoogleFonts.inter(color: AppColors.textMedium)),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: _fetchEstimates,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                elevation: 0,
+                              ),
+                              child: Text('Retry', style: GoogleFonts.inter(color: AppColors.white, fontWeight: FontWeight.w600)),
+                            )
+                          ],
+                        ),
+                      )
                     : ListView(
-                        padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                         children: [
                           if (_surgeMult > 1.0)
                             _SurgeBanner(reason: _surgeReason, multiplier: _surgeMult),
 
-                          const SizedBox(height: 4),
-
-                          // Omni Ride card
+                          // Omni Bike card
                           _RideOptionCard(
-                            icon: PhosphorIconsRegular.car,
-                            title: 'Omni Ride',
-                            description: 'Comfortable ride, up to 4 passengers',
-                            fare: _humanFare,
+                            imageAsset: 'assets/images/motorcycle-svgrepo-com.png',
+                            title: 'omniMU Bike',
+                            description: 'Quick and affordable bike ride',
+                            fare: _bikeFare,
                             durationMin: _durationMin.round(),
-                            isSelected: selectedType == 'human',
+                            isSelected: selectedType == 'bike' || selectedType == 'human',
                             onTap: () {
-                              context.read<AppState>().setSelectedRideType('human');
+                              context.read<AppState>().setSelectedRideType('bike');
+                              if (_appliedCoupon != null) _removeCoupon();
+                            },
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          // Omni Auto card
+                          _RideOptionCard(
+                            imageAsset: 'assets/images/auto-rickshaw-svgrepo-com.png',
+                            title: 'omniMU Auto',
+                            description: 'Comfortable auto ride, up to 3 passengers',
+                            fare: _autoFare,
+                            durationMin: _durationMin.round(),
+                            isSelected: selectedType == 'auto',
+                            onTap: () {
+                              context.read<AppState>().setSelectedRideType('auto');
                               if (_appliedCoupon != null) _removeCoupon();
                             },
                           ),
@@ -232,8 +248,8 @@ class _FarePreviewScreenState extends State<FarePreviewScreen> {
 
                           // Omni Parcel card
                           _RideOptionCard(
-                            icon: PhosphorIconsRegular.package,
-                            title: 'Omni Parcel',
+                            imageAsset: 'assets/images/package-svgrepo-com.png',
+                            title: 'omniMU Parcel',
                             description: 'Send packages across the city',
                             fare: _parcelFare,
                             durationMin: _durationMin.round(),
@@ -245,51 +261,6 @@ class _FarePreviewScreenState extends State<FarePreviewScreen> {
                           ),
 
                           const SizedBox(height: 28),
-
-                          // ── Offers ────────────────────────────
-                          Row(
-                            children: [
-                              Text(
-                                'Available offers',
-                                style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.textDark,
-                                ),
-                              ),
-                              const Spacer(),
-                              if (_offersError != null)
-                                GestureDetector(
-                                  onTap: _fetchOffers,
-                                  child: Text('Retry',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.primary,
-                                    )),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-
-                          if (_offers.isEmpty && _offersError == null)
-                            const _OffersShimmer()
-                          else if (_offers.isNotEmpty)
-                            SizedBox(
-                              height: 96,
-                              child: ListView.separated(
-                                scrollDirection: Axis.horizontal,
-                                itemCount: _offers.length,
-                                separatorBuilder: (_, __) => const SizedBox(width: 10),
-                                itemBuilder: (_, i) => _OfferChip(
-                                  offer: _offers[i],
-                                  isApplied: _appliedCoupon == _offers[i]['code'],
-                                  onTap: () => _applyOffer(_offers[i]['code'] as String),
-                                ),
-                              ),
-                            ),
-
-                          const SizedBox(height: 24),
 
                           // ── Coupon code ───────────────────────
                           Text(
@@ -311,7 +282,6 @@ class _FarePreviewScreenState extends State<FarePreviewScreen> {
                             onApply: _applyCoupon,
                             onRemove: _removeCoupon,
                           ),
-
                           const SizedBox(height: 24),
                         ],
                       ),
@@ -419,7 +389,7 @@ class _SurgeBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(PhosphorIconsRegular.lightning, size: 16, color: AppColors.warning),
+          const Icon(PhosphorIconsRegular.lightning, size: 16, color: AppColors.warning),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -436,7 +406,7 @@ class _SurgeBanner extends StatelessWidget {
 // ── Ride Option Card ──────────────────────────────────────────────────────────
 
 class _RideOptionCard extends StatelessWidget {
-  final IconData icon;
+  final String imageAsset;
   final String title;
   final String description;
   final int fare;
@@ -445,7 +415,7 @@ class _RideOptionCard extends StatelessWidget {
   final VoidCallback onTap;
 
   const _RideOptionCard({
-    required this.icon,
+    required this.imageAsset,
     required this.title,
     required this.description,
     required this.fare,
@@ -477,8 +447,13 @@ class _RideOptionCard extends StatelessWidget {
                 color: isSelected ? AppColors.primary.withValues(alpha: 0.1) : AppColors.backgroundGrey,
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(icon, size: 26,
-                color: isSelected ? AppColors.primary : AppColors.textMedium),
+              child: Center(
+                child: Image.asset(
+                  imageAsset,
+                  width: 32,
+                  height: 32,
+                ),
+              ),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -493,7 +468,7 @@ class _RideOptionCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Icon(PhosphorIconsRegular.clock, size: 12, color: AppColors.textLight),
+                      const Icon(PhosphorIconsRegular.clock, size: 12, color: AppColors.textLight),
                       const SizedBox(width: 4),
                       Text('~$durationMin min',
                         style: GoogleFonts.inter(fontSize: 11, color: AppColors.textLight)),
@@ -509,119 +484,9 @@ class _RideOptionCard extends StatelessWidget {
                   style: GoogleFonts.inter(
                     fontSize: 18, fontWeight: FontWeight.w800,
                     color: isSelected ? AppColors.primary : AppColors.textDark)),
-                if (isSelected)
-                  Container(
-                    margin: const EdgeInsets.only(top: 4),
-                    width: 8, height: 8,
-                    decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle)),
               ],
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Offer Chip ────────────────────────────────────────────────────────────────
-
-class _OfferChip extends StatelessWidget {
-  final Map<String, dynamic> offer;
-  final bool isApplied;
-  final VoidCallback onTap;
-
-  const _OfferChip({required this.offer, required this.isApplied, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final title       = offer['title']       as String? ?? '';
-    final description = offer['description'] as String? ?? '';
-    final code        = offer['code']        as String? ?? '';
-
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        width: 200,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: isApplied
-              ? AppColors.primary.withValues(alpha: 0.08)
-              : AppColors.backgroundGrey,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: isApplied ? AppColors.primary : AppColors.border,
-            width: isApplied ? 1.5 : 1,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  isApplied
-                      ? PhosphorIconsRegular.checkCircle
-                      : PhosphorIconsRegular.tag,
-                  size: 14,
-                  color: isApplied ? AppColors.primary : AppColors.textMedium,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  code,
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: isApplied ? AppColors.primary : AppColors.textMedium,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                const Spacer(),
-                if (isApplied)
-                  Text('Applied',
-                    style: GoogleFonts.inter(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primary,
-                    )),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(title,
-              style: GoogleFonts.inter(
-                fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textDark)),
-            const SizedBox(height: 2),
-            Text(description,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.inter(fontSize: 11, color: AppColors.textMedium)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Offers Shimmer ────────────────────────────────────────────────────────────
-
-class _OffersShimmer extends StatelessWidget {
-  const _OffersShimmer();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 96,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: 3,
-        separatorBuilder: (_, __) => const SizedBox(width: 10),
-        itemBuilder: (_, __) => Container(
-          width: 200,
-          decoration: BoxDecoration(
-            color: AppColors.backgroundGrey,
-            borderRadius: BorderRadius.circular(14),
-          ),
         ),
       ),
     );
@@ -821,77 +686,61 @@ class _ConfirmBar extends StatelessWidget {
           16, 12, 16, 16 + MediaQuery.of(context).padding.bottom),
       decoration: const BoxDecoration(
         color: AppColors.white,
-        border: Border(top: BorderSide(color: AppColors.divider)),
+        border: Border(top: BorderSide(color: AppColors.border)),
       ),
-      child: FilledButton(
-        onPressed: onConfirm,
-        style: FilledButton.styleFrom(
-          backgroundColor: AppColors.primary,
-          foregroundColor: AppColors.white,
-          minimumSize: const Size.fromHeight(56),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text('Confirm Ride',
-              style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700)),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(20),
+      child: Row(
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Total fare',
+                style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textMedium),
               ),
-              child: hasDiscount
-                  ? Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('₹$baseFare',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            decoration: TextDecoration.lineThrough,
-                            color: Colors.white.withValues(alpha: 0.65),
-                          )),
-                        const SizedBox(width: 4),
-                        Text('₹$finalFare',
-                          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800)),
-                      ],
-                    )
-                  : Text('₹$baseFare',
-                      style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 2),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '₹$finalFare',
+                    style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textDark, height: 1.1),
+                  ),
+                  if (hasDiscount) ...[
+                    const SizedBox(width: 6),
+                    Text(
+                      '₹$baseFare',
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textLight,
+                        decoration: TextDecoration.lineThrough,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(width: 20),
+          Expanded(
+            child: ElevatedButton(
+              onPressed: onConfirm,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
+              ),
+              child: Text(
+                'Confirm Ride',
+                style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.white),
+              ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Error View ────────────────────────────────────────────────────────────────
-
-class _ErrorView extends StatelessWidget {
-  final String message;
-  final VoidCallback onRetry;
-  const _ErrorView({required this.message, required this.onRetry});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.wifi_off_rounded, size: 48, color: AppColors.textLight),
-            const SizedBox(height: 16),
-            Text(message, textAlign: TextAlign.center,
-              style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMedium)),
-            const SizedBox(height: 20),
-            OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

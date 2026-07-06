@@ -10,7 +10,7 @@ import '../services/ride_service.dart';
 import '../utils/vehicle_marker.dart';
 import '../services/safety_service.dart';
 import '../widgets/hold_to_activate_button.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
