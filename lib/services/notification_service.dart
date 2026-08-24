@@ -11,8 +11,13 @@ class NotificationService {
     try {
       final messaging = FirebaseMessaging.instance;
 
-      // Request permission (required on iOS; no-op on Android)
+      // Request permission (required on Android 13+ and iOS)
       await messaging.requestPermission(alert: true, badge: true, sound: true);
+      await messaging.setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
 
       final token = await messaging.getToken();
       if (token == null) return;

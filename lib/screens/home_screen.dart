@@ -75,8 +75,28 @@ class _HomeScreenState extends State<HomeScreen> with LocationGuardMixin<HomeScr
     _loadRecentSearches();
     _pickupFocus.addListener(_onPickupFocusChange);
     _destFocus.addListener(_onDestFocusChange);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _initLocation());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initLocation();
+      _checkActiveRide();
+    });
     initLocationGuard();
+  }
+
+  Future<void> _checkActiveRide() async {
+    try {
+      final appState = context.read<AppState>();
+      final destination = await appState.checkAndRestoreActiveRide();
+      if (!mounted) return;
+      if (destination == 'searching') {
+        Navigator.pushReplacementNamed(context, AppRouter.searching);
+      } else if (destination == 'driverMatched') {
+        Navigator.pushReplacementNamed(context, AppRouter.driverMatched);
+      } else if (destination == 'inTransit') {
+        Navigator.pushReplacementNamed(context, AppRouter.inTransit);
+      }
+    } catch (e) {
+      debugPrint('[HomeScreen] _checkActiveRide error: $e');
+    }
   }
 
   @override
@@ -189,32 +209,12 @@ class _HomeScreenState extends State<HomeScreen> with LocationGuardMixin<HomeScr
 
   void _enterSearch([PlaceItem? place]) {
     final state = context.read<AppState>();
-    if (_pickupCtrl.text.isEmpty && state.currentAddress.isNotEmpty) {
-      _pickupCtrl.text = state.currentAddress;
+    if (place != null) {
+      if (place.lat != null && place.lng != null) {
+        state.setDestination(place.name, place.lat!, place.lng!);
+      }
     }
-    setState(() {
-      _mode = _Mode.searching;
-      _activeField = 'destination';
-      if (place != null) {
-        _destCtrl.text = place.name;
-        if (place.lat != null && place.lng != null) {
-          state.setDestination(place.name, place.lat!, place.lng!);
-          if (state.pickupLat != 0) {
-            _fitRouteBounds();
-          } else {
-            _moveCamera(LatLng(place.lat!, place.lng!));
-          }
-        }
-      }
-    });
-    Future.delayed(const Duration(milliseconds: 200), () {
-      if (!mounted) return;
-      if (place != null && place.lat != null) {
-        FocusScope.of(context).unfocus();
-      } else {
-        FocusScope.of(context).requestFocus(_destFocus);
-      }
-    });
+    Navigator.pushNamed(context, AppRouter.routeSelection);
   }
 
   void _exitSearch() {
@@ -222,28 +222,12 @@ class _HomeScreenState extends State<HomeScreen> with LocationGuardMixin<HomeScr
     setState(() { _mode = _Mode.idle; _suggestions = []; });
   }
 
-  void _onVerticalDragUpdate(DragUpdateDetails details) {
-    final screenH = MediaQuery.of(context).size.height;
-    final defaultIdleH = screenH * 0.40;
-    final baseHeight = _mode == _Mode.searching ? screenH : defaultIdleH;
-    final newHeight = ((_draggedHeight ?? baseHeight) - (details.primaryDelta ?? 0.0))
-        .clamp(defaultIdleH - 30.0, screenH);
-    setState(() { _isDragging = true; _draggedHeight = newHeight; });
-  }
+  void _onVerticalDragUpdate(DragUpdateDetails details) {}
 
   void _onVerticalDragEnd(DragEndDetails details) {
-    final screenH = MediaQuery.of(context).size.height;
-    final defaultIdleH = screenH * 0.40;
-    final currentHeight = _draggedHeight ?? (_mode == _Mode.searching ? screenH : defaultIdleH);
-    setState(() {
-      _isDragging = false;
-      _draggedHeight = null;
-      if (currentHeight > (defaultIdleH + screenH) / 2) {
-        _enterSearch();
-      } else {
-        _exitSearch();
-      }
-    });
+    if (details.primaryVelocity != null && details.primaryVelocity! < -150) {
+      Navigator.pushNamed(context, AppRouter.routeSelection);
+    }
   }
 
   void _onType(String query) {
@@ -348,36 +332,38 @@ class _HomeScreenState extends State<HomeScreen> with LocationGuardMixin<HomeScr
         body: Stack(
           fit: StackFit.expand,
           children: [
-          GoogleMap(
-            onMapCreated: (c) {
-              _mapController = c;
-              final s = context.read<AppState>();
-              if (s.currentLat != 0) _moveCamera(LatLng(s.currentLat, s.currentLng));
-            },
-            initialCameraPosition: CameraPosition(target: _cameraTarget, zoom: 15),
-            style: MapStyles.premiumStyle,
-            myLocationEnabled: true,
-            myLocationButtonEnabled: false,
-            zoomControlsEnabled: false,
-            mapToolbarEnabled: false,
-            compassEnabled: false,
-            padding: EdgeInsets.only(bottom: cardH - 24),
-            markers: {
-              if (state.pickupLat != 0)
-                Marker(
-                  markerId: const MarkerId('pickup'),
-                  position: LatLng(state.pickupLat, state.pickupLng),
-                  icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-                  infoWindow: const InfoWindow(title: 'Pickup'),
-                ),
-              if (state.destinationLat != 0)
-                Marker(
-                  markerId: const MarkerId('destination'),
-                  position: LatLng(state.destinationLat, state.destinationLng),
-                  icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-                  infoWindow: const InfoWindow(title: 'Destination'),
-                ),
-            },
+          RepaintBoundary(
+            child: GoogleMap(
+              onMapCreated: (c) {
+                _mapController = c;
+                final s = context.read<AppState>();
+                if (s.currentLat != 0) _moveCamera(LatLng(s.currentLat, s.currentLng));
+              },
+              initialCameraPosition: CameraPosition(target: _cameraTarget, zoom: 15),
+              style: MapStyles.premiumStyle,
+              myLocationEnabled: true,
+              myLocationButtonEnabled: false,
+              zoomControlsEnabled: false,
+              mapToolbarEnabled: false,
+              compassEnabled: false,
+              padding: const EdgeInsets.only(bottom: 240),
+              markers: {
+                if (state.pickupLat != 0)
+                  Marker(
+                    markerId: const MarkerId('pickup'),
+                    position: LatLng(state.pickupLat, state.pickupLng),
+                    icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+                    infoWindow: const InfoWindow(title: 'Pickup'),
+                  ),
+                if (state.destinationLat != 0)
+                  Marker(
+                    markerId: const MarkerId('destination'),
+                    position: LatLng(state.destinationLat, state.destinationLng),
+                    icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+                    infoWindow: const InfoWindow(title: 'Destination'),
+                  ),
+              },
+            ),
           ),
 
           Positioned(

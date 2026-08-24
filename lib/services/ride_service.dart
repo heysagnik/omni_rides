@@ -255,12 +255,14 @@ class RideService {
   // Cancel Ride
   Future<bool> cancelRide(String rideId, String reason) async {
     try {
+      debugPrint('[UserApp CancelRide] Requesting cancel for ride: $rideId, reason: "$reason"');
       final response = await _apiService.post('/ride/$rideId/cancel', body: {
         'reason': reason,
       });
-      return response.statusCode == 200;
+      debugPrint('[UserApp CancelRide] Response: ${response.statusCode} - ${response.body}');
+      return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
-      debugPrint('Error cancelling ride: $e');
+      debugPrint('[UserApp CancelRide] Error cancelling ride: $e');
       return false;
     }
   }
@@ -296,36 +298,21 @@ class RideService {
     }
   }
 
-  // Returns the most recent ride that is still active (not completed/cancelled)
-  // 'searching' is intentionally excluded — on cold app launch a lingering
-  // searching ride is stale and should NOT be resumed.
-  static const _activeStatuses = [
-    'searching',
-    'driver_assigned',
-    'driver_en_route',
-    'driver_arrived',
-    'ride_started',
-    'in_progress',
-  ];
-
+  // Returns the active in-progress ride from /ride/active
   Future<Map<String, dynamic>?> getActiveRide() async {
     try {
-      final response = await _apiService.get('/ride/history');
-      if (response.statusCode != 200) return null;
-      final data = jsonDecode(response.body);
-      final List rides = data is List ? data : (data['rides'] ?? []);
-      debugPrint('Diagnostic: Fetched ${rides.length} rides from history.');
-      for (final ride in rides) {
-        debugPrint('Checking ride ID=${ride['id']} with status=${ride['status']}');
-        if (_activeStatuses.contains(ride['status'])) {
-          debugPrint('Active ride match found! ID=${ride['id']}, status=${ride['status']}');
-          return ride as Map<String, dynamic>;
+      debugPrint('[UserApp] Checking active ride via /ride/active...');
+      final response = await _apiService.get('/ride/active');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['hasActiveRide'] == true && data['ride'] != null) {
+          debugPrint('[UserApp] Active ride found: ID=${data['ride']['id']}, status=${data['ride']['status']}');
+          return data['ride'] as Map<String, dynamic>;
         }
       }
-      debugPrint('Diagnostic: No active ride match found in history.');
       return null;
     } catch (e) {
-      debugPrint('Error getting active ride: $e');
+      debugPrint('[UserApp] Error getting active ride: $e');
       return null;
     }
   }

@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -26,25 +28,25 @@ class _SplashScreenState extends State<SplashScreen>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1800),
+      duration: const Duration(milliseconds: 500),
     );
 
     _logoFade = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.0, 0.45, curve: Curves.easeOut),
+        curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
       ),
     );
-    _logoScale = Tween<double>(begin: 0.7, end: 1.0).animate(
+    _logoScale = Tween<double>(begin: 0.85, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.0, 0.45, curve: Curves.easeOutBack),
+        curve: const Interval(0.0, 0.6, curve: Curves.easeOutBack),
       ),
     );
     _taglineFade = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.4, 0.7, curve: Curves.easeIn),
+        curve: const Interval(0.3, 0.8, curve: Curves.easeIn),
       ),
     );
 
@@ -54,45 +56,61 @@ class _SplashScreenState extends State<SplashScreen>
 
   Future<void> _initializeApp() async {
     final appState = context.read<AppState>();
+    final currentUser = FirebaseAuth.instance.currentUser;
 
-    final results = await Future.wait([
-      appState.syncWithBackend(),
-      Future.delayed(const Duration(milliseconds: 1800)),
-      _prefetchLocation(appState),
-    ]);
+    // Trigger non-blocking background tasks early
+    unawaited(_prefetchLocation(appState));
+    unawaited(UpdateService.checkAndPrompt(context));
 
-    if (!mounted) return;
-
-    // Check for app updates — blocks navigation if force update is required
-    final canContinue = await UpdateService.checkAndPrompt(context);
-    if (!canContinue || !mounted) return;
-
-    final route = results[0] as String;
-
-    if (route == 'needs_phone') {
-      Navigator.pushReplacementNamed(context, AppRouter.addPhone);
+    // If no logged in user, navigate straight to auth immediately
+    if (currentUser == null) {
+      await Future.delayed(const Duration(milliseconds: 250));
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, AppRouter.authOptions);
       return;
     }
 
-    if (route == 'home') {
-      final activeRideRoute = await appState.checkAndRestoreActiveRide();
+    // Authenticated user path
+    try {
+      final route = await appState
+          .syncWithBackend()
+          .timeout(const Duration(seconds: 3), onTimeout: () => 'home');
+
       if (!mounted) return;
-      switch (activeRideRoute) {
-        case 'searching':
-          Navigator.pushReplacementNamed(context, AppRouter.searching);
-          return;
-        case 'driverMatched':
-          Navigator.pushReplacementNamed(context, AppRouter.driverMatched);
-          return;
-        case 'inTransit':
-          Navigator.pushReplacementNamed(context, AppRouter.inTransit);
-          return;
+
+      if (route == 'needs_phone') {
+        Navigator.pushReplacementNamed(context, AppRouter.addPhone);
+        return;
       }
-      Navigator.pushReplacementNamed(context, AppRouter.home);
-    } else if (route == 'new_user') {
-      Navigator.pushReplacementNamed(context, AppRouter.login);
-    } else {
-      Navigator.pushReplacementNamed(context, AppRouter.authOptions);
+
+      if (route == 'home') {
+        final activeRideRoute = await appState
+            .checkAndRestoreActiveRide()
+            .timeout(const Duration(seconds: 4), onTimeout: () => null);
+
+        if (!mounted) return;
+        switch (activeRideRoute) {
+          case 'searching':
+            Navigator.pushReplacementNamed(context, AppRouter.searching);
+            return;
+          case 'driverMatched':
+            Navigator.pushReplacementNamed(context, AppRouter.driverMatched);
+            return;
+          case 'inTransit':
+            Navigator.pushReplacementNamed(context, AppRouter.inTransit);
+            return;
+        }
+        Navigator.pushReplacementNamed(context, AppRouter.home);
+      } else if (route == 'new_user') {
+        Navigator.pushReplacementNamed(context, AppRouter.login);
+      } else {
+        Navigator.pushReplacementNamed(context, AppRouter.authOptions);
+      }
+    } catch (e) {
+      debugPrint('[SplashScreen] init error: $e');
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, AppRouter.home);
+      }
     }
   }
 
