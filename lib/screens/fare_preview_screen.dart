@@ -216,8 +216,8 @@ class _FarePreviewScreenState extends State<FarePreviewScreen> {
 
                           // Omni Bike card
                           _RideOptionCard(
-                            imageAsset: 'assets/images/motorcycle-svgrepo-com.png',
-                            title: 'omniMU Bike',
+                            imageAsset: 'assets/images/motorcycle.png',
+                            title: 'Bike',
                             description: 'Quick and affordable bike ride',
                             fare: _bikeFare,
                             durationMin: _durationMin.round(),
@@ -232,8 +232,8 @@ class _FarePreviewScreenState extends State<FarePreviewScreen> {
 
                           // Omni Auto card
                           _RideOptionCard(
-                            imageAsset: 'assets/images/auto-rickshaw-svgrepo-com.png',
-                            title: 'omniMU Auto',
+                            imageAsset: 'assets/images/auto-rickshaw.png',
+                            title: 'Auto',
                             description: 'Comfortable auto ride, up to 3 passengers',
                             fare: _autoFare,
                             durationMin: _durationMin.round(),
@@ -248,8 +248,8 @@ class _FarePreviewScreenState extends State<FarePreviewScreen> {
 
                           // Omni Parcel card
                           _RideOptionCard(
-                            imageAsset: 'assets/images/package-svgrepo-com.png',
-                            title: 'omniMU Parcel',
+                            imageAsset: 'assets/images/package.png',
+                            title: 'Parcel',
                             description: 'Send packages across the city',
                             fare: _parcelFare,
                             durationMin: _durationMin.round(),

@@ -47,4 +47,10 @@ flutter:
   uses-material-design: true
   assets:
     - .env
-    - assets/images/
+    - assets/images/app_icon.png
+    - assets/images/app_icon_launcher.png
+    - assets/images/auto-rickshaw.png
+    - assets/images/car-sedan.png
+    - assets/images/car-suv.png
+    - assets/images/motorcycle.png
+    - assets/images/package.png

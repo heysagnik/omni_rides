@@ -24,7 +24,7 @@ class InTransitScreen extends StatefulWidget {
 }
 
 class _InTransitScreenState extends State<InTransitScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   Timer? _pollTimer;
   Timer? _etaTimer;
   GoogleMapController? _mapController;
@@ -44,6 +44,7 @@ class _InTransitScreenState extends State<InTransitScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     final state = context.read<AppState>();
     _etaMinutes = state.etaMinutes;
     _originalEta = state.etaMinutes;
@@ -63,6 +64,17 @@ class _InTransitScreenState extends State<InTransitScreen>
     });
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden) {
+      _pollTimer?.cancel();
+      _etaTimer?.cancel();
+    } else if (state == AppLifecycleState.resumed) {
+      _startPolling();
+      _startEtaPolling();
+    }
+  }
+
   Future<void> _loadVehicleIcon() async {
     final rideType = context.read<AppState>().selectedRideType;
     final icon = await buildVehicleMarker(rideType);
@@ -73,7 +85,8 @@ class _InTransitScreenState extends State<InTransitScreen>
   void _startPolling() {
     final rideId = context.read<AppState>().rideId;
     if (rideId.isEmpty) return;
-
+    
+    _pollTimer?.cancel();
     _pollTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
       if (!mounted) {
         timer.cancel();
@@ -135,7 +148,7 @@ class _InTransitScreenState extends State<InTransitScreen>
     final rideId = context.read<AppState>().rideId;
     if (rideId.isEmpty) return;
 
-    _fetchEta(rideId); // immediate first fetch
+    _etaTimer?.cancel();
     _etaTimer = Timer.periodic(
       const Duration(seconds: 30),
       (_) => _fetchEta(rideId),
@@ -273,6 +286,7 @@ class _InTransitScreenState extends State<InTransitScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _pollTimer?.cancel();
     _etaTimer?.cancel();
     _mapController?.dispose();

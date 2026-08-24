@@ -28,7 +28,7 @@ class DriverMatchedScreen extends StatefulWidget {
   State<DriverMatchedScreen> createState() => _DriverMatchedScreenState();
 }
 
-class _DriverMatchedScreenState extends State<DriverMatchedScreen> {
+class _DriverMatchedScreenState extends State<DriverMatchedScreen> with WidgetsBindingObserver {
   final RideService _rideService = RideService();
   Timer? _pollTimer;
   Timer? _trackTimer;       // live-location polling (every 4 s)
@@ -43,6 +43,7 @@ class _DriverMatchedScreenState extends State<DriverMatchedScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _buildMapOverlay(); // immediately render markers from state data
       _fetchAndPoll();    // fetch fresh data in background
@@ -50,7 +51,18 @@ class _DriverMatchedScreenState extends State<DriverMatchedScreen> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden) {
+      _pollTimer?.cancel();
+      _trackTimer?.cancel();
+    } else if (state == AppLifecycleState.resumed) {
+      _fetchAndPoll();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _pollTimer?.cancel();
     _trackTimer?.cancel();
     _mapController?.dispose();
@@ -218,6 +230,8 @@ class _DriverMatchedScreenState extends State<DriverMatchedScreen> {
   // ── Data fetching ────────────────────────────────────────────────────────
 
   Future<void> _fetchAndPoll() async {
+    _pollTimer?.cancel();
+    _trackTimer?.cancel();
     await _updateDriverLiveLocation(); // immediate first fetch
     await _fetchRide();
     if (!mounted) return;
